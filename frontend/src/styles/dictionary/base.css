@@ -1,0 +1,68 @@
+/* 导入变量 */
+
+
+/* 词典容器基础样式 */
+.dictionary-container {
+  font-size: var(--dict-font-size);
+  line-height: var(--dict-line-height);
+  color: var(--dict-text-color);
+  background-color: var(--dict-bg-color);
+  font-family: var(--dict-font-main);
+  word-wrap: break-word;
+  overflow-x: hidden;
+  padding-bottom: 40px;
+}
+
+/* 音频图标通用样式 */
+.dictionary-container .audio-icon {
+  cursor: pointer;
+  display: inline-block;
+  width: var(--audio-icon-size);
+  height: var(--audio-icon-size);
+  color: var(--audio-icon-color);
+  transition: all 0.2s ease;
+  -webkit-user-select: none;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.dictionary-container .audio-icon:hover {
+  color: var(--audio-icon-hover);
+  transform: scale(1.1);
+}
+
+/* 释义容器通用样式 */
+.dictionary-container .sense-container {
+  margin: 12px 0;
+  padding: 16px;
+  border-radius: var(--dict-radius);
+  border: 1px solid var(--dict-border-color);
+  background: #f9fafb;
+}
+
+/* 例句通用样式 */
+.dictionary-container .example-text {
+  font-style: italic;
+  color: var(--dict-text-color);
+  margin: 4px 0;
+  line-height: 1.45;
+}
+
+/* 自定义滚动条 */
+.dictionary-container ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dictionary-container ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dictionary-container ::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.dictionary-container ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}

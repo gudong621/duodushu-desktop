@@ -1,0 +1,49 @@
+:root {
+  /* 词典通用变量 */
+  --dict-font-size: 14px;
+  --dict-line-height: 1.5;
+  --dict-text-color: #374151;
+  --dict-bg-color: #ffffff;
+  --dict-radius: 8px;
+  --dict-gap: 8px;
+
+  /* 字体 */
+  --dict-font-main: var(--font-geist-sans, Arial, sans-serif);
+  --dict-font-serif: 'Bookerly', Georgia, serif;
+  --dict-font-mono: 'Lucida Sans Unicode', monospace;
+
+  /* 音频图标 */
+  --audio-icon-size: 1.2em;
+  --audio-icon-color: #9ca3af;
+  --audio-icon-hover: #3b82f6;
+}
+
+/* 朗文专属颜色 */
+.longmanDictionary {
+  --dict-primary: hsl(224, 68%, 36%);
+  --dict-pos-color: darkred;
+  --dict-example-color: #808080;
+  --dict-bg-color: #f8fafd;
+  --dict-border-color: #d1e0ff;
+}
+
+/* 牛津专属颜色 */
+.oxfordDictionary {
+  --dict-primary: #0072cf;
+  --dict-pos-color: #db8c39;
+  --dict-example-color: #6b7280;
+  --dict-bg-color: rgb(0 136 221 / 6%);
+  --dict-border-color: #a5d6a7;
+}
+
+/* 韦氏专属颜色 - 黑白灰银简约风格 */
+.websterDictionary {
+  --dict-primary: #1a1a1a;
+  --dict-pos-color: #4a4a4a;
+  --dict-example-color: #6b7280;
+  --dict-bg-color: #ffffff;
+  --dict-border-color: #e5e5e5;
+  --dict-silver-accent: #c0c0c0;
+  --dict-silver-light: #f5f5f5;
+  --dict-silver-border: #d0d0d0;
+}

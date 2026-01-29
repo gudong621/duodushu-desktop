@@ -1,0 +1,253 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 20px;
+}
+
+/* PDF Reader Selection Fix */
+.react-pdf__Page__textContent ::selection {
+  background: rgba(59, 130, 246, 0.3); /* Blue-500 with opacity */
+  color: transparent;
+}
+
+/* Constrain selection height */
+.react-pdf__Page__textContent span {
+    line-height: 1 !important; /* Force tight line height */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* MDX Dictionary Content Styles - Commented out to allow individual dictionary styles (Oxford, Longman, Webster) to apply */
+/*
+.mdx-content {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  color: #333;
+}
+
+.mdx-content h1,
+.mdx-content h2,
+.mdx-content h3 {
+  font-size: 14px !important;
+  font-weight: bold;
+  color: #1a1a1a;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.mdx-content .hw,
+.mdx-content .headword,
+.mdx-content .HWD {
+  font-size: 15px !important;
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.mdx-content .pron,
+.mdx-content .phon,
+.mdx-content [class*="pron"] {
+  font-family: monospace;
+  color: #666;
+  font-size: 12px !important;
+}
+
+.mdx-content .pos,
+.mdx-content [class*="pos"] {
+  font-style: italic;
+  color: #059669;
+  font-size: 11px !important;
+  background: #ecfdf5;
+  padding: 0 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+}
+
+.mdx-content .def,
+.mdx-content [class*="def"],
+.mdx-content .sense {
+  margin: 4px 0;
+  padding-left: 8px;
+  border-left: none !important;
+}
+
+.mdx-content .ex,
+.mdx-content [class*="example"],
+.mdx-content .x,
+.mdx-content .EXAMPLE {
+  color: #555;
+  font-style: italic;
+  font-size: 12px !important;
+  margin: 2px 0;
+  padding-left: 8px;
+}
+
+.mdx-content .tran,
+.mdx-content [class*="tran"],
+.mdx-content .chn {
+  color: #1d4ed8;
+  font-weight: 600;
+  font-size: 12px !important;
+}
+
+.mdx-content a[href*="sound"],
+.mdx-content .spk,
+.mdx-content [class*="sound"] {
+  display: inline-block;
+  cursor: pointer;
+  color: #3b82f6;
+  margin: 0 2px;
+}
+
+.mdx-content a[href*="sound"]::before {
+  content: "🔊";
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.mdx-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 20px;
+}
+
+.mdx-content .gramexa::after,
+.mdx-content .colloexa::after {
+  display: none !important;
+}
+
+.mdx-content .sensenum {
+  background: transparent !important;
+  color: #6b7280 !important;
+  font-weight: bold !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  min-width: auto !important;
+  text-align: left;
+  margin-right: 6px !important;
+  border: none !important;
+  font-size: 14px !important;
+  vertical-align: baseline !important;
+}
+
+.mdx-content .ac, 
+.mdx-content .freq, 
+.mdx-content .level,
+.mdx-content .asset,
+.mdx-content .imgholder,
+.mdx-content [href*="topic"],
+.mdx-content .Topic,
+.mdx-content .relatedtopics,
+.mdx-content .buttons,
+.mdx-content .box {
+  display: none !important;
+}
+
+.mdx-content a.topic,
+.mdx-content span.gl {
+    color: #9ca3af !important;
+}
+
+.mdx-content .signpost {
+  background: transparent !important;
+  color: #9ca3af !important;
+  border: none !important;
+  font-weight: normal !important;
+  font-size: 11px !important;
+  text-transform: uppercase;
+  margin-left: 4px;
+}
+
+.mdx-content .pos {
+  background: transparent !important;
+  color: #059669 !important;
+  font-weight: 600 !important;
+  font-style: italic !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.mdx-content .def,
+.mdx-content .sense {
+  border-left: none !important;
+  margin-left: 0 !important;
+  margin-bottom: 12px !important;
+  position: relative !important;
+}
+
+.mdx-content .example {
+    color: #4b5563 !important;
+    margin-left: 12px !important;
+    position: relative;
+    font-style: italic;
+}
+*/
+
+/* IPA Phonetic Font Fix */
+.ipa-phonetic {
+  font-family: "Inter", "Geist Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Lucida Sans Unicode", "Arial Unicode MS";
+  font-feature-settings: "kern", "liga", "clig", "calt";
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,35 @@
+{
+  "dicts": {
+    "朗文": {
+      "name": "朗文",
+      "filename": "朗文.mdx",
+      "size": 114329819,
+      "word_count": 162014,
+      "imported_at": "2026-01-28T17:29:55.801076",
+      "is_active": true
+    },
+    "牛津": {
+      "name": "牛津",
+      "filename": "牛津.mdx",
+      "size": 58176806,
+      "word_count": 622808,
+      "imported_at": "2026-01-28T17:32:32.991678",
+      "is_active": true
+    },
+    "韦氏": {
+      "name": "韦氏",
+      "filename": "韦氏.mdx",
+      "size": 29449132,
+      "word_count": 91096,
+      "imported_at": "2026-01-29T00:24:29.944320",
+      "is_active": true
+    }
+  },
+  "priority": [
+    "韦氏",
+    "朗文",
+    "牛津",
+    "ECDICT"
+  ],
+  "auto_index": true
+}

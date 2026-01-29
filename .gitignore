@@ -1,0 +1,70 @@
+# Common & OS
+node_modules/
+dist/
+dist_app/
+build/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+nul
+.claude/
+.ruff_cache/
+.pytest_cache/
+*.txt
+
+# Frontend (Next.js)
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/next-env.d.ts
+.env*.local
+npm-debug.log*
+yarn-debug.log*
+
+# Backend (Python/FastAPI)
+backend/venv/
+backend/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+backend/dist/
+backend/extracted/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/scripts/*.log
+extraction.log
+backend.log
+
+# Environment & Config
+.env
+backend/.env
+app_settings*.json
+
+# Data & Dictionaries
+*.db
+*.db-shm
+*.db-wal
+data/
+backend/data/
+dicts/imported/*
+!dicts/imported/.gitkeep
+dicts/*.db
+*.mdx
+*.mdd
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Audio Cache
+uploads/audio_cache/
+
+# Agent & AI Data
+.gemini/
+.sisyphus/
+.agent/
+brain/

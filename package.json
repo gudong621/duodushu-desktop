@@ -1,0 +1,62 @@
+{
+  "name": "duodushu-desktop",
+  "version": "1.0.0",
+  "description": "Immersive English Learning Workstation",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:frontend dev:electron",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:electron": "wait-on tcp:3000 && tsc -p electron && electron .",
+    "build": "npm run build:frontend && npm run build:backend && npm run build:electron && npm run package",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && ..\\.venv\\Scripts\\pyinstaller.exe backend.spec --noconfirm --clean",
+    "build:electron": "tsc -p electron",
+    "package": "electron-builder"
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "next.js",
+    "python",
+    "fastapi"
+  ],
+  "author": "Duodushu Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.3.3",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.duodushu.desktop",
+    "productName": "Duodushu",
+    "directories": {
+      "output": "dist_app",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "frontend/out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist/backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "portable": {
+      "artifactName": "DuoDuShu-Desktop-Portable.exe"
+    }
+  },
+  "dependencies": {
+    "electron-serve": "^3.0.1"
+  }
+}

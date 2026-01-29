@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && npm run copy-pdf-worker",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "copy-pdf-worker": "node scripts/copy-pdf-worker.js"
   },
   "dependencies": {
     "epubjs": "^0.3.93",

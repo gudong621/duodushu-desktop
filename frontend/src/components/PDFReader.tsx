@@ -5,10 +5,12 @@ import { Document, Page as PDFPage, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 
-// Use CDN worker to avoid Node.js polyfill issues
-// Using PDF.js 5.4.296 from cdn.jsdelivr.net
+// Configure PDF.js worker - using CDN version
 const pdfWorkerUrl = `https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.296/build/pdf.worker.min.mjs`;
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+// 注意：PDF 阅读需要联网加载 PDF.js worker 文件（约 700KB）
+// 首次加载后会缓存到浏览器，后续使用缓存版本
 
 interface WordData {
   text: string;

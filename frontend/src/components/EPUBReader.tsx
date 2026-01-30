@@ -871,7 +871,7 @@ export default function EPUBReader({
                             (range as any).expand('word');
                             const word = range.toString().trim();
                              // Simple regex to clean the word
-                            const cleanWord = word.replace(/[^a-zA-ZÀ-ÿ'-]/g, '');
+                            const cleanWord = word.replace(/[^a-zA-ZÀ-ÿ'-]/g, '').toLowerCase();
                             if (cleanWord && cleanWord.length > 1) {
                                 log.debug('Looked up word:', cleanWord);
                                 

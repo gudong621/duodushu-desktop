@@ -67,13 +67,25 @@ class BingSpeechService {
       this.socket = new WebSocket(url);
       this.socket.onmessage = this.onSocketMessage.bind(this);
       this.socket.onclose = () => console.warn("Bing TTS WebSocket closed.");
-      this.socket.onerror = (error) => {
-        console.error("Bing TTS WebSocket error:", error);
-        this.socket?.close();
+
+      // Attach error handler immediately to suppress browser's default error logging
+      let errorHandled = false;
+      this.socket.onerror = () => {
+        errorHandled = true;
       };
 
-      await new Promise<void>((resolve) => {
-        if (!this.socket) return;
+      await new Promise<void>((resolve, reject) => {
+        if (!this.socket) {
+          reject(new Error("WebSocket creation failed"));
+          return;
+        }
+
+        this.socket.onerror = (error) => {
+          console.debug("Bing TTS WebSocket error (will fallback to backend):", error);
+          this.socket?.close();
+          reject(new Error(`WebSocket error: ${error}`));
+        };
+
         this.socket.onopen = () => {
           console.log(
             reopened
@@ -85,8 +97,25 @@ class BingSpeechService {
         };
       });
     } else if (this.socket.readyState === WebSocket.CONNECTING) {
-      await new Promise<void>((resolve) => {
-        this.socket?.addEventListener("open", () => resolve(), { once: true });
+      await new Promise<void>((resolve, reject) => {
+        if (!this.socket) {
+          reject(new Error("WebSocket is null"));
+          return;
+        }
+
+        const handleOpen = () => {
+          this.socket?.removeEventListener("error", handleError);
+          resolve();
+        };
+
+        const handleError = (error: Event) => {
+          this.socket?.removeEventListener("open", handleOpen);
+          console.debug("Bing TTS WebSocket error during connection (will fallback to backend):", error);
+          reject(new Error("WebSocket connection failed"));
+        };
+
+        this.socket.addEventListener("open", handleOpen, { once: true });
+        this.socket.addEventListener("error", handleError, { once: true });
       });
     }
   }
@@ -180,28 +209,23 @@ class BingSpeechService {
     inputText: string,
     config: VoiceConfig
   ): Promise<string> {
-    try {
-      const ssml = this.createSSML(inputText, config);
-      const requestId = this.generateUuid();
-      const requestMessage = `X-RequestId:${requestId}\r\n${CONTENT_TYPE_SSML}${ssml}`;
+    const ssml = this.createSSML(inputText, config);
+    const requestId = this.generateUuid();
+    const requestMessage = `X-RequestId:${requestId}\r\n${CONTENT_TYPE_SSML}${ssml}`;
 
-      this.requests[requestId] = {
-        audioDataChunks: [],
-        resolve: () => {},
-        reject: () => {},
-      };
+    this.requests[requestId] = {
+      audioDataChunks: [],
+      resolve: () => {},
+      reject: () => {},
+    };
 
-      const promise = new Promise<string>((resolve, reject) => {
-        this.requests[requestId].resolve = resolve;
-        this.requests[requestId].reject = reject;
-      });
+    const promise = new Promise<string>((resolve, reject) => {
+      this.requests[requestId].resolve = resolve;
+      this.requests[requestId].reject = reject;
+    });
 
-      await this.sendWhenReady(requestMessage);
-      return promise;
-    } catch (error) {
-      console.error("Failed to prepare audio request:", error);
-      throw error;
-    }
+    await this.sendWhenReady(requestMessage);
+    return promise;
   }
 }
 

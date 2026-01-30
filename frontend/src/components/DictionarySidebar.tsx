@@ -237,16 +237,16 @@ function DictionarySidebar({
   useEffect(() => {
     const fetchDicts = async () => {
       try {
-        const res = await fetch(`/api/dicts?_t=${Date.now()}`);
+        const res = await fetch(`/api/dicts/?_t=${Date.now()}`);
         if (res.ok) {
           const dicts = await res.json();
-          // 过滤出用户导入的词典
+          // 过滤出用户导入的词典（包括ECDICT内置词典）
           const importedDicts = dicts
-            .filter((d: any) => d.type === "imported" && d.is_active)
+            .filter((d: any) => (d.type === "imported" || d.type === "builtin") && d.is_active)
             .map((d: any) => ({ id: d.name, label: d.name }));
-          
+
           setSources(importedDicts);
-          
+
           if (importedDicts.length > 0) {
             // 如果当前 activeTab 不在新的 sources 中，重置为第一个
             if (!activeTab || !importedDicts.some((s: any) => s.id === activeTab)) {
@@ -260,8 +260,14 @@ function DictionarySidebar({
         console.error("Failed to load dicts:", e);
       }
     };
+
     fetchDicts();
-  }, [activeTab]);
+
+    // 每 2 秒刷新一次词典列表，确保能及时显示启用/禁用的词典
+    const interval = setInterval(fetchDicts, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // 同步 activeTab
   useEffect(() => {
@@ -518,32 +524,46 @@ function DictionarySidebar({
             )}
 
             {/* 词典切换 Tabs - 移到内容流中，MDX 区域上方 */}
+            {/* 如果是多词典结果，显示所有词典的标签；否则显示可切换的标签 */}
             {sources.length > 0 && (
               <div className="flex items-center gap-2 mb-4 border-b pb-2 overflow-x-auto no-scrollbar">
-                {sources.map((source) => (
-                  <button
-                    key={source.id}
-                    onClick={() => {
-                      if (activeTab === source.id) return;
-                      setActiveTab(source.id);
-                      if (wordData?.word) {
-                        onSearch(wordData.word, source.id);
-                      }
-                    }}
-                    disabled={loading}
-                    className={`
-                      px-3 py-1.5 text-xs font-medium rounded-full transition-all whitespace-nowrap
-                      ${
-                        activeTab === source.id
-                          ? "bg-gray-900 text-white shadow-sm"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }
-                      ${loading ? "opacity-50 cursor-not-allowed" : ""}
-                    `}
-                  >
-                    {source.label}
-                  </button>
-                ))}
+                {(wordData as any)?.multiple_sources ? (
+                  // 多词典模式：显示所有启用词典的标签
+                  sources.map((source) => (
+                    <div
+                      key={source.id}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-900 text-white shadow-sm whitespace-nowrap"
+                    >
+                      {source.label}
+                    </div>
+                  ))
+                ) : (
+                  // 单词典模式：显示可切换的标签
+                  sources.map((source) => (
+                    <button
+                      key={source.id}
+                      onClick={() => {
+                        if (activeTab === source.id) return;
+                        setActiveTab(source.id);
+                        if (wordData?.word) {
+                          onSearch(wordData.word, source.id);
+                        }
+                      }}
+                      disabled={loading}
+                      className={`
+                        px-3 py-1.5 text-xs font-medium rounded-full transition-all whitespace-nowrap
+                        ${
+                          activeTab === source.id
+                            ? "bg-gray-900 text-white shadow-sm"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }
+                        ${loading ? "opacity-50 cursor-not-allowed" : ""}
+                      `}
+                    >
+                      {source.label}
+                    </button>
+                  ))
+                )}
               </div>
             )}
 
@@ -561,6 +581,67 @@ function DictionarySidebar({
                 <p className="text-gray-400 text-xs">
                   前往 <a href="/dicts" className="text-blue-500 hover:underline">词典管理</a> 导入并启用词典
                 </p>
+              </div>
+            ) : (wordData as any)?.multiple_sources ? (
+              // 多词典模式：显示所有词典的结果
+              <div className="min-h-[200px] relative">
+                {loading ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                  </div>
+                ) : null}
+                <div className="space-y-8">
+                  {(wordData as any)?.results?.map((result: any, resultIndex: number) => (
+                    <div key={resultIndex} className="pb-6 border-b last:border-b-0">
+                      {/* 词典源标签 */}
+                      <div className="mb-4">
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                          {result.source_label}
+                        </span>
+                      </div>
+
+                      {/* 检查是否是 MDX 内容 */}
+                      {result.html_content ? (
+                        <div className="prose prose-sm max-w-none">
+                          <DictionaryContent
+                            word={wordData.word}
+                            source={result.source_label}
+                            htmlContent={result.html_content}
+                            rawData={result.raw_data}
+                          />
+                        </div>
+                      ) : result.meanings && result.meanings.length > 0 ? (
+                        // 结构化内容
+                        <div className="space-y-4">
+                          {result.meanings.map((m: any, i: number) => (
+                            <div key={i}>
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
+                                {m.partOfSpeech}
+                              </span>
+                              <ul className="space-y-3">
+                                {m.definitions.map((def: any, j: number) => (
+                                  <li
+                                    key={j}
+                                    className="text-sm pl-4 relative before:absolute before:left-0 before:top-1.5 before:w-1 before:h-1 before:bg-gray-300 before:rounded-full"
+                                  >
+                                    <div className="text-gray-800 leading-relaxed">
+                                      {def.definition}
+                                    </div>
+                                    {def.example && (
+                                      <div className="text-gray-400 text-xs mt-1 italic">
+                                        &quot;{def.example}&quot;
+                                      </div>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : isMdxContent ? (
               <div className="min-h-[200px] relative">

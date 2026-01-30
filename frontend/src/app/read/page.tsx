@@ -484,8 +484,9 @@ function ReaderContent() {
 
       // Strip punctuation
       const word = rawWord
-        .replace(/^[^\w]+|[^werd]+$/g, "")
-        .replace(/[—–]/g, "-");
+        .replace(/^[^\w]+|[^\w]+$/g, "")
+        .replace(/[—–]/g, "-")
+        .toLowerCase();
 
       if (!word) return;
 
@@ -551,18 +552,47 @@ function ReaderContent() {
       }
 
       try {
-        const { lookupWord } = await import("../../lib/api");
-        const data = await lookupWord(
-          word,
-          isSource ? sourceOrContext : undefined,
-        );
+        const { lookupWord, lookupWordMultipleSources } = await import("../../lib/api");
+
+        let data;
+
+        // If switching to a specific source, query only that source
+        if (isSource && sourceOrContext) {
+          data = await lookupWord(word, sourceOrContext);
+        } else {
+          // Otherwise, query all enabled dictionaries
+          try {
+            const res = await fetch(`/api/dicts/?_t=${Date.now()}`);
+            if (res.ok) {
+              const dicts = await res.json();
+              const enabledDicts = dicts
+                .filter((d: any) => (d.type === "imported" || d.type === "builtin") && d.is_active)
+                .map((d: any) => d.name);
+
+              if (enabledDicts.length > 0) {
+                // Query all enabled dictionaries in parallel
+                data = await lookupWordMultipleSources(word, enabledDicts);
+              } else {
+                // Fallback to single query if no enabled dicts
+                data = await lookupWord(word);
+              }
+            } else {
+              // Fallback to single query if fetch fails
+              data = await lookupWord(word);
+            }
+          } catch (e) {
+            console.warn("Failed to fetch enabled dictionaries, falling back to single query:", e);
+            data = await lookupWord(word);
+          }
+        }
+
         // Merge backend data with local context
         // Note: data from backend will overwrite existing fields with fresh ones
         setActiveWord({
           ...(data || { word, meanings: [] }),
           context_sentence: contextSentence,
         });
-        
+
         // 新增：查询跟踪（只对已收藏的单词）
         try {
           if (id) {
@@ -582,7 +612,7 @@ function ReaderContent() {
           word,
           meanings: [],
           context_sentence: contextSentence,
-        }); 
+        });
       } finally {
         setLoadingDict(false);
       }

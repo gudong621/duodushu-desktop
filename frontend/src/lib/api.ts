@@ -99,6 +99,59 @@ export async function lookupWord(word: string, source?: string) {
   return res.json();
 }
 
+// Dictionary lookup for multiple sources (parallel queries)
+export async function lookupWordMultipleSources(word: string, sources: string[]) {
+  if (!sources || sources.length === 0) {
+    return null;
+  }
+
+  console.log(`Looking up word: ${word} from ${sources.length} source(s): ${sources.join(", ")}`);
+
+  // Parallel queries for all sources
+  const promises = sources.map((source) =>
+    fetch(`${API_URL}/api/dict/${word}?source=${encodeURIComponent(source)}`, {
+      cache: "no-store",
+    })
+      .then((res) => {
+        if (!res.ok) {
+          if (res.status === 404) return null;
+          throw new Error(`Lookup failed for source: ${source}`);
+        }
+        return res.json();
+      })
+      .catch((err) => {
+        console.warn(`Failed to lookup from ${source}:`, err);
+        return null;
+      })
+  );
+
+  const results = await Promise.all(promises);
+
+  // Filter out null results and merge them
+  const validResults = results.filter((r) => r !== null);
+
+  if (validResults.length === 0) {
+    return null;
+  }
+
+  // If only one result, return it directly
+  if (validResults.length === 1) {
+    return validResults[0];
+  }
+
+  // If multiple results, merge them with source information
+  // Return an array of results with source labels
+  return {
+    word,
+    multiple_sources: true,
+    results: validResults.map((result, index) => ({
+      ...result,
+      source_index: index,
+      source_label: sources[index],
+    })),
+  };
+}
+
 // Check word sources
 export async function checkWordSources(
   word: string,
@@ -499,7 +552,7 @@ export interface DictInfo {
  * 获取所有已安装的词典列表
  */
 export async function fetchDicts(): Promise<DictInfo[]> {
-  const res = await fetchWithTimeout(`${API_URL}/api/dicts`, 5000);
+  const res = await fetchWithTimeout(`${API_URL}/api/dicts/`, 5000);
   if (!res.ok) throw new Error('Failed to fetch dicts');
   return res.json();
 }

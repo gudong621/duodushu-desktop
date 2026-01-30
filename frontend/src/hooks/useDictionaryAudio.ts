@@ -93,10 +93,7 @@ export function useDictionaryAudio({
 
     // 清理文本
     text = text
-      .replace(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]+/g, "") // 移除中文字符
-      .replace(/\//g, ", ") // 替换斜杠为逗号
-      .replace(/\\/g, ", ") // 替换反斜杠
-      .replace(/\/\//g, "") // 移除可能的注释符
+      .replace(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]+/g, " ") // 移除中文字符，用空格替代
       .replace(/\s+/g, " ")
       .trim()
       .replace(/[.。!！?？,，;；:：]+$/g, "") // 移除结尾标点
@@ -130,9 +127,9 @@ export function useDictionaryAudio({
       audio.onended = () => URL.revokeObjectURL(blobUrl);
       await audio.play();
     } catch (err) {
-      console.error("Frontend TTS failed:", err);
+      console.debug("Frontend TTS failed, falling back to backend:", err);
       try {
-        console.log("Falling back to backend TTS API...");
+        console.log("Falling back to backend TTS API for text:", text);
         const { streamSpeech } = await import("../lib/api");
         const voice = "en-US-MichelleNeural";
         const blobUrl = await streamSpeech(text, voice);

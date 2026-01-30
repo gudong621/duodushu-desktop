@@ -163,16 +163,21 @@ function startPythonBackend() {
   // 在开发模式下，我们使用项目根目录下的 data
   // 在生产模式(打包后)，如果exe旁边有data，则用那个，否则用 userData
   let dataPath: string;
-  
+
   if (IS_DEV) {
      dataPath = path.join(process.cwd(), 'backend', 'data'); // 开发环境默认路径
   } else {
-     // 生产环境检查逻辑 (待完善)
-     const portableDataPath = path.join(path.dirname(appPath), '..', 'data'); 
+     // 生产环境检查逻辑：便携模式优先
+     // process.execPath 是 exe 文件的完整路径
+     // 检查 exe 同级目录下是否有 data 文件夹
+     const exeDir = path.dirname(process.execPath);
+     const portableDataPath = path.join(exeDir, 'data');
      if (fs.existsSync(portableDataPath)) {
          dataPath = portableDataPath;
+         logToFile(`便携模式已启用: ${dataPath}`);
      } else {
          dataPath = app.getPath('userData');
+         logToFile(`使用系统 userData 目录: ${dataPath}`);
      }
   }
   

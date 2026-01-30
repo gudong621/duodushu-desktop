@@ -505,17 +505,18 @@ class DictManager:
             if dict_name != "ECDICT" and dict_name in self.config["dicts"]:
                 dict_info = self.config["dicts"][dict_name]
                 mdx_file = self.imported_dir / f"{dict_name}.mdx"
-                if mdx_file.exists():
-                    result.append(
-                        {
-                            "name": dict_name,
-                            "type": "imported",
-                            "size": mdx_file.stat().st_size,
-                            "word_count": dict_info.get("word_count", 0),
-                            "is_active": dict_info.get("is_active", True),
-                            "is_builtin": False,
-                        }
-                    )
+                # 获取文件大小，如果文件不存在则使用配置中的大小
+                file_size = mdx_file.stat().st_size if mdx_file.exists() else dict_info.get("size", 0)
+                result.append(
+                    {
+                        "name": dict_name,
+                        "type": "imported",
+                        "size": file_size,
+                        "word_count": dict_info.get("word_count", 0),
+                        "is_active": dict_info.get("is_active", True),
+                        "is_builtin": False,
+                    }
+                )
 
         return result
 

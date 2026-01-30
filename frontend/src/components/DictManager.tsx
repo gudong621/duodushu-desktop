@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DictImportDialog } from './DictImportDialog';
-import { fetchDicts, deleteDict, DictInfo } from '../lib/api';
+import { fetchDicts, deleteDict, toggleDict, DictInfo } from '../lib/api';
 
 export function DictManager() {
   const [dicts, setDicts] = useState<DictInfo[]>([]);
@@ -49,18 +49,10 @@ export function DictManager() {
 
   const handleToggle = async (dictName: string, active: boolean) => {
     try {
-      const response = await fetch(`/api/dicts/${dictName}/toggle`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active }),
-      });
-
-      if (response.ok) {
-        await loadDicts();
-      } else {
-        alert('操作失败');
-      }
-    } catch {
+      await toggleDict(dictName, active);
+      await loadDicts();
+    } catch (error) {
+      console.error('Failed to toggle dict:', error);
       alert('操作失败');
     }
   };

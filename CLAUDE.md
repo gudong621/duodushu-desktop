@@ -2,149 +2,156 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Output Language Specification
+
+所有回复、思考过程、计划、总结、解释、代码注释，必须全部使用简体中文。
+严禁使用英文，除非是代码中的关键词、变量名、库名或不可翻译的专有名词。
+回复时优先使用自然、流畅的中文表达，确保易懂。
+
 ## Project Overview
 
-**Duodushu Desktop** (多读书桌面版) is an immersive English learning workstation built as a desktop application using:
-- **Electron** - Desktop shell and process management
-- **Next.js 16** - Frontend UI (React 19, static export mode)
-- **Python FastAPI** - Backend services for document processing, TTS, AI, and dictionary lookup
+**Duodushu Desktop** (多读书桌面版) 是一款本地优先且支持绿色便携的沉浸式英语学习工作站。
 
-The application supports PDF/EPUB/TXT reading, three-tier dictionary lookup (Cache->Local->AI), FTS5 full-text search with AI Q&A, and TTS voice synthesis.
+**技术栈**:
+- **Electron** - 桌面应用外壳和进程管理
+- **Next.js 16** - 前端 UI (React 19, 静态导出模式)
+- **Python FastAPI** - 后端服务 (文档处理、TTS、AI、词典查询)
+
+**核心功能**: PDF/EPUB/TXT 阅读、三级词典查询、全文搜索、AI 问答、TTS 语音合成
 
 ## Architecture
 
-This is a **three-process desktop application**:
+**三进程桌面应用**:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Electron Main Process                     │
 │                  (electron/main.ts)                          │
-│  - Spawns Python backend (port 8000)                        │
-│  - Creates BrowserWindow with preload script                │
-│  - Loads Next.js app (dev: localhost:3000, prod: static)    │
-│  - Manages portable data directory paths                   │
+│  - 启动 Python 后端 (端口 8000)                             │
+│  - 创建浏览器窗口                                            │
+│  - 加载 Next.js 应用                                        │
+│  - 管理便携模式数据目录                                      │
 └─────────────────────────────────────────────────────────────┘
          ↓                              ↓
 ┌─────────────────────┐      ┌──────────────────────────────────┐
 │  Python Backend     │      │     Next.js Frontend             │
 │  (FastAPI)          │◄────►│  (Static Export)                  │
-│  Port: 8000         │ HTTP │  - No server-side routing        │
-│                    │      │  - All API calls to :8000         │
-│  - Book processing  │      │  - PDF/EPUB/TXT readers           │
-│  - TTS/AI services  │      │  - Dictionary lookup              │
-│  - Vocabulary mgmt  │      │                                  │
+│  Port: 8000         │ HTTP │  - 无服务端路由                  │
+│                    │      │  - 所有 API 调用到 :8000         │
+│  - 书籍处理        │      │  - PDF/EPUB/TXT 阅读器           │
+│  - TTS/AI 服务     │      │  - 词典查询                      │
+│  - 词汇管理        │      │                                  │
 └─────────────────────┘      └──────────────────────────────────┘
 ```
 
-### Key Difference from Web Apps
-- Next.js uses `output: 'export'` - purely static files, no API routes
-- Python backend runs as separate child process (spawned by Electron)
-- Frontend communicates via HTTP to `localhost:8000` (configurable)
+**关键特点**:
+- Next.js 使用 `output: 'export'` - 纯静态文件，无 API 路由
+- Python 后端作为独立子进程运行
+- 前端通过 HTTP 与后端通信 (localhost:8000)
+
+## Important File Locations
+
+| 用途 | 路径 |
+|------|------|
+| **Electron 入口** | `electron/main.ts` - 启动后端、创建窗口、管理便携模式 |
+| **前端入口** | `frontend/src/app/page.tsx` - 首页（书架） |
+| **后端入口** | `backend/app/main.py` - FastAPI 应用初始化 |
+| **后端启动器** | `backend/run_backend.py` - CLI 入口，支持 `--port` 和 `--data-dir` |
+| **构建配置** | `package.json` - Electron Builder 配置和构建脚本 |
+| **前端配置** | `frontend/next.config.ts` - 静态导出模式配置 |
+| **PyInstaller 配置** | `backend/backend.spec` - Python 打包配置 |
+| **API 客户端** | `frontend/src/lib/api.ts` - 前端 API 包装器 |
+
+## Backend Architecture
+
+**FastAPI** + SQLAlchemy 2.0 Async，遵循 Router → Service → Model 模式：
+
+- **Routers** (`backend/app/routers/`): 薄层，用于参数校验和序列化 (< 20 行)
+- **Services** (`backend/app/services/`): 业务逻辑（厚层）
+- **Models** (`backend/app/models/`): SQLAlchemy ORM
+- **Parsers** (`backend/app/parsers/`): 文档解析（工厂模式）
+
+**关键约定**:
+- 使用 `pathlib.Path` 而不是 `os.path`
+- 使用 `Depends(get_db)` 进行数据库会话依赖注入（禁止手动 `db.close()`）
+- 耗时操作（AI、解析）必须使用 `BackgroundTasks`
+- API 参数使用 **snake_case** (Pydantic 模型)
+
+## Frontend Architecture
+
+**Next.js 16** + App Router + React 19 + Tailwind CSS 4：
+
+- **App Router** (`frontend/src/app/`): 页面和布局
+- **Components** (`frontend/src/components/`): UI 组件
+- **Lib** (`frontend/src/lib/`): API 客户端、工具函数
+- **Hooks**: Zustand 状态管理（避免 Prop Drilling）
+
+**关键约定**:
+- 所有 API 请求通过 `lib/api.ts` 代理转发
+- 使用 `lib/logger.ts` 记录日志（禁止 `console.log`）
+- 发送到后端的 JSON 字段必须使用 **snake_case** (如 `page_content: pageContent`)
+- 纯静态导出，无服务端路由
 
 ## Development Commands
 
 ```bash
-# Install dependencies
-npm install                           # Root dependencies (Electron, build tools)
-cd frontend && npm install            # Frontend dependencies
-cd backend && pip install -r requirements.txt  # Backend dependencies
+# 安装依赖
+npm install                           # 根目录依赖
+cd frontend && npm install            # 前端依赖
+cd backend && pip install -r requirements.txt  # 后端依赖
 
-# Development mode (runs all three processes)
-npm run dev                           # Starts frontend + Electron in parallel
+# 开发模式（启动所有三个进程）
+npm run dev                           # 启动前端 + Electron
 
-# Individual development
-cd frontend && npm run dev            # Frontend only (port 3000)
-cd backend && python -m uvicorn app.main:app --reload  # Backend only (port 8000)
+# 单独启动各模块
+cd frontend && npm run dev            # 前端开发服务器 (端口 3000)
+cd backend && python -m uvicorn app.main:app --reload  # 后端 (端口 8000)
 
-# Building
-npm run build                         # Full build: frontend → backend → electron → package
-npm run build:frontend                # Build frontend to frontend/out
-npm run build:backend                 # Build backend with PyInstaller to backend/dist/backend
-npm run build:electron                # Compile Electron TypeScript
-npm run package                       # Package with electron-builder → dist_app/
+# 构建
+npm run build                         # 完整构建
+npm run build:frontend                # 前端构建
+npm run build:backend                 # 后端构建
+npm run build:electron                # Electron 编译
+npm run package                       # 应用打包
 
-# Testing
-cd backend && pytest                  # Run all tests
-cd backend && pytest tests/test_vocabulary.py  # Run specific test
+# 测试
+cd backend && pytest                  # 运行所有测试
+cd backend && pytest tests/test_vocabulary.py  # 运行特定测试
 
-# Linting
-cd frontend && npm run lint           # ESLint check
+# 代码检查
+cd frontend && npm run lint           # ESLint 检查
 ```
 
-## Important File Locations
+## Data Storage
 
-| Purpose | Path |
-|---------|------|
-| **Electron entry** | `electron/main.ts` - Spawns backend, creates window, manages portable mode |
-| **Frontend entry** | `frontend/src/app/page.tsx` - Home page (bookshelf) |
-| **Backend entry** | `backend/app/main.py` - FastAPI app initialization |
-| **Backend runner** | `backend/run_backend.py` - CLI entry with `--port` and `--data-dir` args |
-| **Build config** | `package.json` - Electron Builder config, build scripts |
-| **Frontend config** | `frontend/next.config.ts` - Static export mode (`output: 'export'`) |
-| **PyInstaller spec** | `backend/backend.spec` - Python packaging configuration |
-| **API client** | `frontend/src/lib/api.ts` - Frontend API wrapper (points to localhost:8000) |
+应用支持三种数据存储模式：
 
-## Data Storage (Portable Mode)
+| 模式 | 数据位置 | 使用场景 |
+|------|---------|---------|
+| **开发环境** | `backend/data/` | 本地开发调试 |
+| **标准模式** | `C:\Users\{username}\AppData\Roaming\duodushu-desktop\` | 用户安装应用 |
+| **便携模式** | exe 同级的 `data/` 目录 | 免安装、U 盘运行 |
 
-The app supports **portable mode** where data travels with the executable:
-
-```
-Duodushu/
-├── Duodushu.exe
-├── resources/
-└── data/              ← Portable data directory (created next to exe)
-    ├── app.db         (SQLite database)
-    ├── uploads/       (User uploaded files)
-    └── dicts/         (Imported dictionaries)
-```
-
-**Data path resolution** (in `electron/main.ts`):
-1. Check for portable `data/` folder next to exe
-2. If found, use portable mode
-3. Otherwise, use system `userData` directory
-4. In development, use `backend/data`
-
-Backend data path is passed via `--data-dir` argument when spawning the Python process.
-
-## Backend Architecture
-
-**FastAPI** with SQLAlchemy 2.0 Async, following Router → Service → Model pattern:
-
-- **Routers** (`backend/app/routers/`): Thin layer for validation/serialization (< 20 lines)
-- **Services** (`backend/app/services/`): Business logic (thick layer)
-- **Models** (`backend/app/models/`): SQLAlchemy ORM
-- **Parsers** (`backend/app/parsers/`): Document parsing (Factory pattern for PDF/EPUB/TXT)
-
-**Key conventions**:
-- Use `pathlib.Path` instead of `os.path`
-- Use `Depends(get_db)` for database sessions (no manual `db.close()`)
-- Use `BackgroundTasks` for long-running operations (AI, parsing)
-- API parameters use **snake_case** (Pydantic models)
-
-## Frontend Architecture
-
-**Next.js 16** with App Router, React 19, Tailwind CSS 4:
-
-- **App Router** (`frontend/src/app/`): Pages and layouts
-- **Components** (`frontend/src/components/`): UI components (readers, AI sidebar)
-- **Lib** (`frontend/src/lib/`): API client, utilities
-- **Hooks**: Zustand for state management (avoid prop drilling)
-
-**Key conventions**:
-- All API requests go through `lib/api.ts` (proxies to localhost:8000)
-- Use `lib/logger.ts` for logging (not `console.log`)
-- API request bodies must use **snake_case** (e.g., `page_content: pageContent`)
-- No server-side routing - purely static export
-
-## Language
-
-**Always use Simplified Chinese (简体中文)** for code comments, documentation, and user-facing text unless explicitly requested otherwise.
+**详见**: [DATA_STORAGE.md](./docs/DATA_STORAGE.md)
 
 ## Common Tasks
 
-- **Add new API endpoint**: Create Pydantic model in `backend/app/routers/`, add service method, update `frontend/src/lib/api.ts`
-- **Add new page**: Add to `frontend/src/app/` (Next.js App Router)
-- **Modify build output**: Edit `package.json` (Electron Builder config) or `frontend/next.config.ts`
-- **Change data directory**: Modify `electron/main.ts` (portable mode detection) and backend config
-- **Debug backend**: Check logs from spawned Python process or run `backend/run_backend.py` directly
-- **Debug frontend**: Use React DevTools, check `electron/main.ts` for dev URL configuration
+- **添加新 API 端点**: 在 `backend/app/routers/` 创建 Pydantic 模型，添加 service 方法，更新 `frontend/src/lib/api.ts`
+- **添加新页面**: 添加到 `frontend/src/app/` (Next.js App Router)
+- **修改构建输出**: 编辑 `package.json` (Electron Builder 配置) 或 `frontend/next.config.ts`
+- **更改数据目录**: 修改 `electron/main.ts` (便携模式检测) 和后端配置
+- **调试后端**: 查看生成的 Python 进程日志或直接运行 `backend/run_backend.py`
+- **调试前端**: 使用 React DevTools，查看 `electron/main.ts` 中的开发 URL 配置
+
+## Documentation
+
+完整文档见 [README.md](./README.md)
+
+- **[开发指南](./docs/DEVELOPMENT.md)** - 环境设置和开发命令
+- **[部署指南](./docs/DEPLOYMENT.md)** - 构建、打包和便携模式
+- **[数据存储](./docs/DATA_STORAGE.md)** - 数据存储位置和迁移
+- **[API 文档](./docs/API.md)** - 后端 API 参考
+- **[代码约定](./docs/CONVENTIONS.md)** - 代码规范和最佳实践
+- **[故障排查](./docs/TROUBLESHOOTING.md)** - 常见问题和解决方案
+- **[技术架构](./docs/桌面端_技术架构文档.md)** - 系统设计
+- **[产品需求](./docs/桌面端_PRD.md)** - 功能需求和版本规划

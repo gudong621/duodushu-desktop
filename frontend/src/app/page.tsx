@@ -4,6 +4,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getBooks, deleteBook, updateBookType, Book } from '../lib/api';
 import UploadDialog from '../components/UploadDialog';
+import SettingsDialog from '../components/SettingsDialog';
 import Link from 'next/link';
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [bookToDelete, setBookToDelete] = useState<string | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [pollingError, setPollingError] = useState<string | null>(null);
   const [hoveredBookId, setHoveredBookId] = useState<string | null>(null);
 
@@ -150,6 +152,15 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </Link>
+            <button
+              onClick={() => setSettingsDialogOpen(true)}
+              className="w-10 h-10 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0"
+              title="API 配置"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.592c.55 0 1.02.398 1.11.94m-.213 9.526c.106.606.481 1.1.9 1.1.419 0 .794-.494.9-1.1m0 0a15.998 15.998 0 1 0-3.6 0m2.7-4.192c.093.202.232.243.385.243.153 0 .292-.041.385-.243m-4.306.927l1.07-3.292a1 1 0 0 0-.523-1.29 10 10 0 0 0-8.854 1.855m4.306.927-1.07 3.292a1 1 0 0 0 .523 1.29 10 10 0 0 0 8.854-1.855M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -265,6 +276,12 @@ export default function Home() {
         isOpen={uploadDialogOpen}
         onClose={() => setUploadDialogOpen(false)}
         onUploadSuccess={fetchBooks}
+      />
+
+      {/* Settings Dialog */}
+      <SettingsDialog
+        isOpen={settingsDialogOpen}
+        onClose={() => setSettingsDialogOpen(false)}
       />
 
       {/* Delete Confirmation Modal */}

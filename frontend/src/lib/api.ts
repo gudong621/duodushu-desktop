@@ -666,3 +666,41 @@ export async function lookupInDict(dictName: string, word: string): Promise<any>
   if (!res.ok) throw new Error('Failed to lookup word in dict');
   return res.json();
 }
+
+/**
+ * 获取当前 API URL
+ */
+export function getApiUrl(): string {
+  return API_URL;
+}
+
+/**
+ * 获取设置
+ */
+export function getSettings(): { apiUrl: string } {
+  if (typeof window === 'undefined') {
+    return { apiUrl: API_URL };
+  }
+
+  const stored = localStorage.getItem('duodushu_settings');
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return { apiUrl: API_URL };
+    }
+  }
+
+  return { apiUrl: API_URL };
+}
+
+/**
+ * 保存设置
+ */
+export function saveSettings(settings: { apiUrl: string }): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  localStorage.setItem('duodushu_settings', JSON.stringify(settings));
+}

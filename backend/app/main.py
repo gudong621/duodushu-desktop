@@ -11,6 +11,7 @@ from .routers import (
     rag,
     dicts,
     test as test_router,
+    config,
 )
 from app.models import models
 from .models.database import engine, SessionLocal
@@ -130,6 +131,7 @@ app.include_router(bookmarks.router)
 app.include_router(ai.router)
 app.include_router(rag.router)
 app.include_router(dicts.router)
+app.include_router(config.router)
 app.include_router(test_router.router)
 
 # 挂载静态目录

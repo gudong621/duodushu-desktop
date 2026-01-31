@@ -52,11 +52,13 @@ let mainWindow: BrowserWindow | null = null;
 let pythonProcess: ChildProcess | null = null;
 
 // 定义常量
-const IS_DEV = process.env.NODE_ENV === 'development';
+// 定义常量
+// 使用 app.isPackaged 判定是否为生产环境（更可靠）
+const IS_DEV = !app.isPackaged;
 const PY_DIST_FOLDER = 'backend'; // 打包后 Python 可执行文件所在目录名称
 // const PY_MODULE = 'backend'; // Python 模块/可执行文件名
 
-logToFile(`IS_DEV: ${IS_DEV}`);
+logToFile(`IS_DEV: ${IS_DEV} (app.isPackaged: ${app.isPackaged})`);
 
 // 禁用 GPU 以避免崩溃问题
 app.commandLine.appendSwitch('--disable-gpu');
@@ -170,19 +172,47 @@ function startPythonBackend() {
   let dataPath: string;
 
   if (IS_DEV) {
-     dataPath = path.join(process.cwd(), 'backend', 'data'); // 开发环境默认路径
+     // 开发环境：使用 app.getAppPath() 而不是 process.cwd()
+     // app.getAppPath() 返回应用目录（项目根目录），更可靠
+     const appPath = app.getAppPath();
+     dataPath = path.join(appPath, 'backend', 'data');
+     logToFile(`开发模式 - 使用应用目录: ${appPath}`);
   } else {
      // 生产环境检查逻辑：便携模式优先
-     // process.execPath 是 exe 文件的完整路径
-     // 检查 exe 同级目录下是否有 data 文件夹
-     const exeDir = path.dirname(process.execPath);
+     // 1. 检查是否为 electron-builder 的便携式应用 (Portable App)
+     // 此时 process.env.PORTABLE_EXECUTABLE_DIR 会指向真实 exe 所在目录
+     const portableExeDir = process.env.PORTABLE_EXECUTABLE_DIR;
+
+     // 2. 如果不是便携版，则使用 process.execPath (解压版/安装版)
+     const exeDir = portableExeDir ? portableExeDir : path.dirname(process.execPath);
+
      const portableDataPath = path.join(exeDir, 'data');
-     if (fs.existsSync(portableDataPath)) {
+
+     logToFile(`Portable check - Executable Dir: ${exeDir} (Portable Env: ${portableExeDir || 'N/A'})`);
+
+     // 策略：
+     // A. 如果是便携版(PORTABLE_EXECUTABLE_DIR 存在)，强制使用该目录下的 data (自动创建)
+     // B. 如果是普通版，只有当 exe 同级存在 data 目录时才启用便携模式 (USB 模式)
+
+     if (portableExeDir) {
+         // 便携版强制使用同级 data
          dataPath = portableDataPath;
-         logToFile(`便携模式已启用: ${dataPath}`);
+         if (!fs.existsSync(dataPath)) {
+             try {
+                fs.mkdirSync(dataPath);
+             } catch(e) {
+                logErrorToFile('Failed to create portable data dir', e);
+             }
+         }
+         logToFile(`检测到便携版运行环境，强制使用数据目录: ${dataPath}`);
+     } else if (fs.existsSync(portableDataPath)) {
+         // 解压版/安装版：如果发现同级有 data 目录，则使用它 (USB 模式)
+         dataPath = portableDataPath;
+         logToFile(`检测到同级 data 目录，启用便携模式: ${dataPath}`);
      } else {
+         // 默认回退到系统 userData
          dataPath = app.getPath('userData');
-         logToFile(`使用系统 userData 目录: ${dataPath}`);
+         logToFile(`使用标准安装模式 (userData): ${dataPath}`);
      }
   }
   

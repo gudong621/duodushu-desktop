@@ -12,14 +12,24 @@ def main():
     parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind")
     parser.add_argument("--data-dir", type=str, help="Path to data directory")
-    
+
     args = parser.parse_args()
 
     # 设置环境变量，供 app.config 使用
     if args.data_dir:
+        # 确保转换为绝对路径，并验证路径有效性
         data_path = Path(args.data_dir).resolve()
-        os.environ["APP_DATA_DIR"] = str(data_path)
-        print(f"[Backend] Data directory set to: {data_path}")
+
+        # 验证路径是否可访问
+        try:
+            data_path.mkdir(parents=True, exist_ok=True)
+            os.environ["APP_DATA_DIR"] = str(data_path)
+            print(f"[Backend] Data directory set to: {data_path}")
+        except Exception as e:
+            print(f"[Backend] Warning: Failed to create/access data directory {data_path}: {e}")
+            print(f"[Backend] Will use default data directory")
+    else:
+        print(f"[Backend] No --data-dir specified, using default data directory")
     
     # 导入 app (必须在设置环境变量之后)
     # 导入 app (必须在设置环境变量之后)

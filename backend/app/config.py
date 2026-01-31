@@ -15,8 +15,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env_data_dir = os.getenv("APP_DATA_DIR")
 if env_data_dir:
     DATA_DIR = Path(env_data_dir).resolve()
+    logger.info(f"使用环境变量 APP_DATA_DIR: {DATA_DIR}")
 else:
     DATA_DIR = BASE_DIR / "data"
+    logger.warning(f"未设置 APP_DATA_DIR 环境变量，使用默认开发环境路径: {DATA_DIR}")
 
 # 确保数据目录存在
 os.makedirs(DATA_DIR, exist_ok=True)

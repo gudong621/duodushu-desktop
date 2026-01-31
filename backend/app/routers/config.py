@@ -199,16 +199,43 @@ def save_api_keys(keys: APIKeysConfig):
     """保存 API keys 配置（旧版API，向后兼容）"""
     config = load_config()
 
+    # Merge new keys into config
     if "api_keys" not in config:
         config["api_keys"] = {}
-
-    # 只保存非空的 keys
+        
     if keys.gemini_api_key:
         config["api_keys"]["gemini_api_key"] = keys.gemini_api_key
     if keys.deepseek_api_key:
         config["api_keys"]["deepseek_api_key"] = keys.deepseek_api_key
 
-    save_config(config)
+    try:
+        save_config(config)
+        
+        # Also sync to new multi-supplier config format
+        # This ensures that if the user switches to the new UI, the keys are there
+        multi_config = load_multi_supplier_config()
+        
+        if keys.gemini_api_key:
+            multi_config.add_or_update_supplier(SupplierConfig(
+                supplier_type=SupplierType.GEMINI,
+                name="Google Gemini",
+                api_key=keys.gemini_api_key,
+                enabled=True
+            ))
+            
+        if keys.deepseek_api_key:
+            multi_config.add_or_update_supplier(SupplierConfig(
+                supplier_type=SupplierType.DEEPSEEK,
+                name="DeepSeek",
+                api_key=keys.deepseek_api_key,
+                enabled=True
+            ))
+            
+        save_multi_supplier_config(multi_config)
+        
+    except Exception as e:
+        logger.error(f"Failed to save key config: {e}")
+        raise HTTPException(status_code=500, detail="Configuration save failed")
 
     # 更新环境变量
     if keys.gemini_api_key:

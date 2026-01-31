@@ -789,7 +789,7 @@ def find_and_save_example_contexts_native(word: str, db: Session, exclude_book_i
     try:
         extraction_logger.info(f"[例句提取] 开始为单词 '{word}' 提取例句，上限 {max_total} 个")
 
-        # 先查询已有的 example_library 例句数量
+        # 先查询已有的 example_library 例句数量（在事务外查询，避免事务冲突）
         existing_count = db.execute(
             text("""
                 SELECT COUNT(*) FROM word_contexts
@@ -809,95 +809,100 @@ def find_and_save_example_contexts_native(word: str, db: Session, exclude_book_i
 
         extraction_logger.info(f"[例句提取] 单词 '{word}' 还需要提取 {need_to_extract} 个例句")
 
-        with db.begin():
-            # 使用 FTS5 全文搜索（单词边界匹配，性能更好）
-            # MATCH 会自动进行单词边界匹配，不需要额外的正则表达式
-            query_str = """
-                SELECT p.id, p.book_id, p.page_number, p.text_content
-                FROM pages p
-                INNER JOIN pages_fts fts ON p.id = fts.rowid
-                INNER JOIN books b ON p.book_id = b.id
-                WHERE fts.text_content MATCH :word
-                  AND b.book_type = 'example_library'
-            """
+        # 使用 FTS5 全文搜索（单词边界匹配，性能更好）
+        # MATCH 会自动进行单词边界匹配，不需要额外的正则表达式
+        query_str = """
+            SELECT p.id, p.book_id, p.page_number, p.text_content
+            FROM pages p
+            INNER JOIN pages_fts fts ON p.id = fts.rowid
+            INNER JOIN books b ON p.book_id = b.id
+            WHERE fts.text_content MATCH :word
+              AND b.book_type = 'example_library'
+        """
 
-            # 使用引号包裹搜索词以进行精确匹配，并添加首字母大写变体以支持更全的 FTS5 搜索
-            search_variants = [f'"{word}"']
-            if word[0].islower():
-                search_variants.append(f'"{word.capitalize()}"')
+        # 使用引号包裹搜索词以进行精确匹配，并添加首字母大写变体以支持更全的 FTS5 搜索
+        search_variants = [f'"{word}"']
+        if word[0].islower():
+            search_variants.append(f'"{word.capitalize()}"')
 
-            search_match_str = " OR ".join(search_variants)
-            extraction_logger.info(f"[例句提取] FTS5搜索表达式: {search_match_str}")
+        search_match_str = " OR ".join(search_variants)
+        extraction_logger.info(f"[例句提取] FTS5搜索表达式: {search_match_str}")
 
-            pages = db.execute(
-                text(query_str),
-                {"word": search_match_str},
-            ).fetchall()
+        pages = db.execute(
+            text(query_str),
+            {"word": search_match_str},
+        ).fetchall()
 
-            extraction_logger.info(f"[例句提取] FTS5搜索到 {len(pages)} 页包含单词 '{word}'")
+        extraction_logger.info(f"[例句提取] FTS5搜索到 {len(pages)} 页包含单词 '{word}'")
 
-            # 提取句子并保存（标记为 example_library）
-            contexts_found = 0
-            total_sentences = 0
-            for page in pages:
-                if contexts_found >= need_to_extract:  # 达到需要提取的数量
-                    extraction_logger.info(f"[例句提取] 已提取足够数量的例句 ({contexts_found}/{need_to_extract})，停止提取")
-                    break
+        # 提取句子并保存（标记为 example_library）
+        contexts_found = 0
+        total_sentences = 0
+        for page in pages:
+            if contexts_found >= need_to_extract:  # 达到需要提取的数量
+                extraction_logger.info(f"[例句提取] 已提取足够数量的例句 ({contexts_found}/{need_to_extract})，停止提取")
+                break
 
-                # 提取包含这个词的句子
-                sentences = extract_sentences_with_word_native(page[3], word)
-                total_sentences += len(sentences)
-                extraction_logger.info(
-                    f"[例句提取] 从页面 {page[2]} (book_id: {page[1][:8]}...) 提取到 {len(sentences)} 个句子"
-                )
+            # 提取包含这个词的句子
+            sentences = extract_sentences_with_word_native(page[3], word)
+            total_sentences += len(sentences)
+            extraction_logger.info(
+                f"[例句提取] 从页面 {page[2]} (book_id: {page[1][:8]}...) 提取到 {len(sentences)} 个句子"
+            )
 
-                for sentence in sentences:
-                    # 检查是否已存在（修复：使用 lower() 进行大小写不敏感比较）
-                    existing = db.execute(
+            for sentence in sentences:
+                # 检查是否已存在（修复：使用 lower() 进行大小写不敏感比较）
+                existing = db.execute(
+                    text("""
+                    SELECT 1 FROM word_contexts
+                    WHERE lower(word) = lower(:word)
+                      AND book_id = :book_id
+                      AND page_number = :page_number
+                      AND context_sentence = :sentence
+                """),
+                    {
+                        "word": word,
+                        "book_id": page[1],
+                        "page_number": page[2],
+                        "sentence": sentence,
+                    },
+                ).fetchone()
+
+                if not existing:
+                    # 使用 INSERT OR IGNORE 避免唯一约束冲突 (word, book_id, page_number)
+                    # 并限制每页只保存一个例句
+                    db.execute(
                         text("""
-                        SELECT 1 FROM word_contexts
-                        WHERE lower(word) = lower(:word)
-                          AND book_id = :book_id
-                          AND page_number = :page_number
-                          AND context_sentence = :sentence
+                        INSERT OR IGNORE INTO word_contexts
+                            (word, book_id, page_number, context_sentence, is_primary, source_type)
+                            VALUES (:word, :book_id, :page_number, :context_sentence, 0, 'example_library')
                     """),
                         {
                             "word": word,
                             "book_id": page[1],
                             "page_number": page[2],
-                            "sentence": sentence,
+                            "context_sentence": sentence,
+                            "is_primary": 0,
+                            "source_type": "example_library",
                         },
-                    ).fetchone()
+                    )
+                    contexts_found += 1
+                    extraction_logger.info(f"[例句提取] 保存例句 #{contexts_found}: {sentence[:50]}...")
+                    # 每一页只取一个例句，避免同页多句冲突，也增加了例句的多样性
+                    break
 
-                    if not existing:
-                        # 使用 INSERT OR IGNORE 避免唯一约束冲突 (word, book_id, page_number)
-                        # 并限制每页只保存一个例句
-                        db.execute(
-                            text("""
-                            INSERT OR IGNORE INTO word_contexts
-                                (word, book_id, page_number, context_sentence, is_primary, source_type)
-                                VALUES (:word, :book_id, :page_number, :context_sentence, 0, 'example_library')
-                        """),
-                            {
-                                "word": word,
-                                "book_id": page[1],
-                                "page_number": page[2],
-                                "context_sentence": sentence,
-                                "is_primary": 0,
-                                "source_type": "example_library",
-                            },
-                        )
-                        contexts_found += 1
-                        extraction_logger.info(f"[例句提取] 保存例句 #{contexts_found}: {sentence[:50]}...")
-                        # 每一页只取一个例句，避免同页多句冲突，也增加了例句的多样性
-                        break
+        # 手动提交事务
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
-            # 注意：with db.begin() 会自动提交，不需要手动commit
-            extraction_logger.info(
-                f"[例句提取] ✓ 成功为单词 '{word}' 保存 {contexts_found} 个新例句 "
-                f"(处理了 {total_sentences} 个句子，来自 {len(pages)} 页)"
-            )
-            logger.info(f"例句提取完成：'{word}' -> {contexts_found} 个新例句")
+        extraction_logger.info(
+            f"[例句提取] ✓ 成功为单词 '{word}' 保存 {contexts_found} 个新例句 "
+            f"(处理了 {total_sentences} 个句子，来自 {len(pages)} 页)"
+        )
+        logger.info(f"例句提取完成：'{word}' -> {contexts_found} 个新例句")
 
     except Exception as e:
         extraction_logger.error(f"[例句提取] ✗ 错误：为单词 '{word}' 提取例句时失败: {e}")

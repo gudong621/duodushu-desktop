@@ -237,18 +237,21 @@ function DictionarySidebar({
   useEffect(() => {
     const fetchDicts = async () => {
       try {
-        const res = await fetch(`/api/dicts/?_t=${Date.now()}`);
+        // 使用正确的 API URL
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${API_URL}/api/dicts/?_t=${Date.now()}`);
         if (res.ok) {
           const dicts = await res.json();
-          // 过滤出用户导入的词典（包括ECDICT内置词典）
+          
+          // 只过滤出用户导入的词典(不包括ECDICT内置词典)
           const importedDicts = dicts
-            .filter((d: any) => (d.type === "imported" || d.type === "builtin") && d.is_active)
+            .filter((d: any) => d.type === "imported" && d.is_active)
             .map((d: any) => ({ id: d.name, label: d.name }));
 
           setSources(importedDicts);
 
           if (importedDicts.length > 0) {
-            // 如果当前 activeTab 不在新的 sources 中，重置为第一个
+            // 默认选择第一个词典
             if (!activeTab || !importedDicts.some((s: any) => s.id === activeTab)) {
               setActiveTab(importedDicts[0].id);
             }
@@ -271,9 +274,11 @@ function DictionarySidebar({
 
   // 同步 activeTab
   useEffect(() => {
+    // 单词典结果时,同步到对应的词典标签
     if (wordData?.source && sources.some((s) => s.id === wordData.source)) {
       setActiveTab(wordData.source);
     }
+    // 注意:不再在 multiple_sources 时清空 activeTab,保持用户选择
   }, [wordData?.source, sources]);
 
   // 同步 Search Term
@@ -523,53 +528,41 @@ function DictionarySidebar({
               </div>
             )}
 
-            {/* 词典切换 Tabs - 移到内容流中，MDX 区域上方 */}
-            {/* 如果是多词典结果，显示所有词典的标签；否则显示可切换的标签 */}
+
+            {/* 词典切换 Tabs - 始终显示可点击的标签 */}
             {sources.length > 0 && (
               <div className="flex items-center gap-2 mb-4 border-b pb-2 overflow-x-auto no-scrollbar">
-                {(wordData as any)?.multiple_sources ? (
-                  // 多词典模式：显示所有启用词典的标签
-                  sources.map((source) => (
-                    <div
-                      key={source.id}
-                      className="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-900 text-white shadow-sm whitespace-nowrap"
-                    >
-                      {source.label}
-                    </div>
-                  ))
-                ) : (
-                  // 单词典模式：显示可切换的标签
-                  sources.map((source) => (
-                    <button
-                      key={source.id}
-                      onClick={() => {
-                        if (activeTab === source.id) return;
-                        setActiveTab(source.id);
-                        if (wordData?.word) {
-                          onSearch(wordData.word, source.id);
-                        }
-                      }}
-                      disabled={loading}
-                      className={`
-                        px-3 py-1.5 text-xs font-medium rounded-full transition-all whitespace-nowrap
-                        ${
-                          activeTab === source.id
-                            ? "bg-gray-900 text-white shadow-sm"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }
-                        ${loading ? "opacity-50 cursor-not-allowed" : ""}
-                      `}
-                    >
-                      {source.label}
-                    </button>
-                  ))
-                )}
+                {sources.map((source) => (
+                  <button
+                    key={source.id}
+                    onClick={() => {
+                      if (activeTab === source.id) return;
+                      setActiveTab(source.id);
+                      if (wordData?.word) {
+                        onSearch(wordData.word, source.id);
+                      }
+                    }}
+                    disabled={loading}
+                    className={`
+                      px-3 py-1.5 text-xs font-medium rounded-full transition-all whitespace-nowrap
+                      ${
+                        activeTab === source.id
+                          ? "bg-gray-900 text-white shadow-sm"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }
+                      ${loading ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
+                  >
+                    {source.label}
+                  </button>
+                ))}
               </div>
             )}
 
 
+
             {/* Content Display */}
-            {/* 当没有启用的导入词典时，不显示 ECDICT 内容，显示提示 */}
+            {/* 当没有启用的导入词典时，显示提示 */}
             {sources.length === 0 && (wordData as any)?.is_ecdict ? (
               <div className="min-h-[200px] flex flex-col items-center justify-center text-center py-12">
                 <div className="w-16 h-16 mb-4 text-gray-300">
@@ -583,37 +576,39 @@ function DictionarySidebar({
                 </p>
               </div>
             ) : (wordData as any)?.multiple_sources ? (
-              // 多词典模式：显示所有词典的结果
+              // 多词典模式：只显示当前选中标签对应的词典内容
               <div className="min-h-[200px] relative">
                 {loading ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
                   </div>
                 ) : null}
-                <div className="space-y-8">
-                  {(wordData as any)?.results?.map((result: any, resultIndex: number) => (
-                    <div key={resultIndex} className="pb-6 border-b last:border-b-0">
-                      {/* 词典源标签 */}
-                      <div className="mb-4">
-                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                          {result.source_label}
-                        </span>
+                {/* 找到当前选中的词典结果 */}
+                {(() => {
+                  const selectedResult = (wordData as any)?.results?.find((r: any) => r.source_label === activeTab);
+                  if (!selectedResult) {
+                    return (
+                      <div className="text-center text-gray-400 py-8">
+                        <p>请选择词典标签查看释义</p>
                       </div>
-
+                    );
+                  }
+                  return (
+                    <div className="pb-6">
                       {/* 检查是否是 MDX 内容 */}
-                      {result.html_content ? (
+                      {selectedResult.html_content ? (
                         <div className="prose prose-sm max-w-none">
                           <DictionaryContent
                             word={wordData.word}
-                            source={result.source_label}
-                            htmlContent={result.html_content}
-                            rawData={result.raw_data}
+                            source={selectedResult.source_label}
+                            htmlContent={selectedResult.html_content}
+                            rawData={selectedResult.raw_data}
                           />
                         </div>
-                      ) : result.meanings && result.meanings.length > 0 ? (
+                      ) : selectedResult.meanings && selectedResult.meanings.length > 0 ? (
                         // 结构化内容
                         <div className="space-y-4">
-                          {result.meanings.map((m: any, i: number) => (
+                          {selectedResult.meanings.map((m: any, i: number) => (
                             <div key={i}>
                               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">
                                 {m.partOfSpeech}
@@ -638,10 +633,14 @@ function DictionarySidebar({
                             </div>
                           ))}
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="text-center text-gray-400 py-8">
+                          <p>该词典暂无此词条</p>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
               </div>
             ) : isMdxContent ? (
               <div className="min-h-[200px] relative">

@@ -58,6 +58,11 @@ const PY_DIST_FOLDER = 'backend'; // 打包后 Python 可执行文件所在目�
 
 logToFile(`IS_DEV: ${IS_DEV}`);
 
+// 禁用 GPU 以避免崩溃问题
+app.commandLine.appendSwitch('--disable-gpu');
+app.commandLine.appendSwitch('--disable-software-rasterizer');
+app.commandLine.appendSwitch('--no-sandbox');
+
 // Register the scheme as privileged (must be done before app is ready)
 if (!IS_DEV) {
     protocol.registerSchemesAsPrivileged([

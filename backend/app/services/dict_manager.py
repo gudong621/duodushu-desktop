@@ -55,8 +55,17 @@ class DictManager:
         return default_config
 
     def _save_config(self, config: Dict):
-        with open(self.config_file, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
+        # 使用临时文件 + 替换的方式确保原子性，防止保存过程中断导致配置损坏
+        temp_file = self.config_file.with_suffix(".tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            import os
+            os.replace(temp_file, self.config_file)
+        except Exception as e:
+            logger.error(f"保存词典配置失败: {e}")
+            if temp_file.exists():
+                temp_file.unlink()
         self.config = config
 
     def _init_index_db(self):
@@ -490,6 +499,7 @@ class DictManager:
 
         ecdict_size = ECDICT_DB_PATH.stat().st_size if ECDICT_DB_PATH.exists() else 0
 
+        # 首先添加 ECDICT
         result.append(
             {
                 "name": "ECDICT",
@@ -501,22 +511,30 @@ class DictManager:
             }
         )
 
-        for dict_name in self.config["priority"]:
-            if dict_name != "ECDICT" and dict_name in self.config["dicts"]:
-                dict_info = self.config["dicts"][dict_name]
-                mdx_file = self.imported_dir / f"{dict_name}.mdx"
-                # 获取文件大小，如果文件不存在则使用配置中的大小
-                file_size = mdx_file.stat().st_size if mdx_file.exists() else dict_info.get("size", 0)
-                result.append(
-                    {
-                        "name": dict_name,
-                        "type": "imported",
-                        "size": file_size,
-                        "word_count": dict_info.get("word_count", 0),
-                        "is_active": dict_info.get("is_active", True),
-                        "is_builtin": False,
-                    }
-                )
+        # 获取所有已注册的导入词典名
+        registered_dict_names = set(self.config.get("dicts", {}).keys())
+        # 按优先级列表排序
+        priority_list = [n for n in self.config.get("priority", []) if n in registered_dict_names and n != "ECDICT"]
+        # 加上不在优先级列表中的词典（如果有的话）
+        other_dicts = [n for n in registered_dict_names if n not in priority_list and n != "ECDICT"]
+        
+        all_to_show = priority_list + other_dicts
+
+        for dict_name in all_to_show:
+            dict_info = self.config["dicts"][dict_name]
+            mdx_file = self.imported_dir / f"{dict_name}.mdx"
+            # 获取文件大小，如果文件不存在则使用配置中的大小
+            file_size = mdx_file.stat().st_size if mdx_file.exists() else dict_info.get("size", 0)
+            result.append(
+                {
+                    "name": dict_name,
+                    "type": "imported",
+                    "size": file_size,
+                    "word_count": dict_info.get("word_count", 0),
+                    "is_active": dict_info.get("is_active", True),
+                    "is_builtin": False,
+                }
+            )
 
         return result
 

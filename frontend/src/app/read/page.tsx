@@ -491,13 +491,9 @@ function ReaderContent() {
       if (!word) return;
 
       // Check if sourceOrContext is a dictionary source ID
-      // 动态判断：如果是同一个词的查询，且参数较短，大概率是切换词典源
-      const isSwitchingSource = activeWord?.word === word && sourceOrContext && sourceOrContext.length < 20;
-      // 或者是已知的默认词典
-      const defaultSources = ["韦氏", "牛津", "朗文当代", "柯林斯", "剑桥"];
-      const isKnownSource = sourceOrContext && defaultSources.includes(sourceOrContext);
-      
-      const isSource = isSwitchingSource || isKnownSource;
+      // 改进判断逻辑:如果是同一个词的查询,且参数较短(不像句子),则认为是切换词典源
+      const isSwitchingSource = activeWord?.word === word && sourceOrContext && sourceOrContext.length < 50 && !sourceOrContext.includes(' ');
+      const isSource = isSwitchingSource;
 
       // Priority for context sentence:
       // 1. If switching dictionary source, preserve current context_sentence
@@ -560,30 +556,9 @@ function ReaderContent() {
         if (isSource && sourceOrContext) {
           data = await lookupWord(word, sourceOrContext);
         } else {
-          // Otherwise, query all enabled dictionaries
-          try {
-            const res = await fetch(`/api/dicts/?_t=${Date.now()}`);
-            if (res.ok) {
-              const dicts = await res.json();
-              const enabledDicts = dicts
-                .filter((d: any) => (d.type === "imported" || d.type === "builtin") && d.is_active)
-                .map((d: any) => d.name);
-
-              if (enabledDicts.length > 0) {
-                // Query all enabled dictionaries in parallel
-                data = await lookupWordMultipleSources(word, enabledDicts);
-              } else {
-                // Fallback to single query if no enabled dicts
-                data = await lookupWord(word);
-              }
-            } else {
-              // Fallback to single query if fetch fails
-              data = await lookupWord(word);
-            }
-          } catch (e) {
-            console.warn("Failed to fetch enabled dictionaries, falling back to single query:", e);
-            data = await lookupWord(word);
-          }
+          // 直接调用 lookupWord(word) 不传 source 参数
+          // 后端会自动查询所有启用的词典并聚合结果,包含 chinese_translation
+          data = await lookupWord(word);
         }
 
         // Merge backend data with local context

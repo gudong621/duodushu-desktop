@@ -18,7 +18,9 @@ def check_sources(word: str):
 
 @router.get("/{word}")
 def get_definition(word: str, source: str | None = None, db: Session = Depends(get_db)):
-    result = dict_service.lookup_word(db, word, source or "")
+    # 注意: source 为 None 时触发多词典模式, 空字符串则不会
+    # 所以这里不能用 source or "", 必须保持 None
+    result = dict_service.lookup_word(db, word, source)
     if not result:
         raise HTTPException(status_code=404, detail="Word not found")
     return result

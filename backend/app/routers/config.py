@@ -387,7 +387,7 @@ async def test_connection(request: TestConnectionRequest):
 
     # 导入测试服务（稍后实现）
     try:
-        from app.services.supplier_test import test_supplier_connection
+        from app.services.supplier_test_service import test_supplier_connection
         result = await test_supplier_connection(
             supplier_type=supplier_type,
             api_key=request.api_key,

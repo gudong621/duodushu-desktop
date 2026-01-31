@@ -132,14 +132,23 @@ def get_word_details(word: str) -> Optional[Dict]:
         if result:
             return result
 
-        # 2. Basic Lemmatization (for inflections like cringed -> cringe)
+        # 2. Basic Lemmatization (for inflections)
         candidates = []
         if word.endswith("ed"):
-            candidates.extend([word[:-1], word[:-2]])  # cringed -> cringe, baked -> bake, played -> play
-        if word.endswith("ing"):
-            if len(word) > 5:  # playing -> play
+            # cringed -> cringe, baked -> bake, played -> play
+            candidates.extend([word[:-1], word[:-2]])
+            # Double consonant: clapped -> clap, robbed -> rob
+            if len(word) > 5 and word[-3] == word[-4]:
                 candidates.append(word[:-3])
-                candidates.append(word[:-3] + "e")  # baking -> bake
+        if word.endswith("ing"):
+            if len(word) > 5:
+                # playing -> play
+                candidates.append(word[:-3])
+                # baking -> bake
+                candidates.append(word[:-3] + "e")
+                # Double consonant: clapping -> clap, robbing -> rob
+                if len(word) > 6 and word[-4] == word[-5]:
+                    candidates.append(word[:-4])
         if word.endswith("ies"):
             candidates.append(word[:-3] + "y")  # studies -> study
         if word.endswith("es"):
@@ -148,9 +157,10 @@ def get_word_details(word: str) -> Optional[Dict]:
             candidates.append(word[:-1])  # cats -> cat
 
         for cand in candidates:
+            if not cand: continue
             result = _query(cand)
             if result:
-                logger.info(f"ECDICT: Found lemma '{cand}' for '{word}'")
+                logger.debug(f"ECDICT: Found lemma '{cand}' for '{word}'")
                 return result
 
         return None

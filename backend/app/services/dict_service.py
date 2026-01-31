@@ -348,6 +348,124 @@ def _should_try_lemma(original_word: str, mdx_res: Dict) -> bool:
     return True
 
 
+def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
+    """Look up word in ALL active dictionaries and return aggregated results.
+
+    Args:
+        db: Database session
+        word: Word to look up
+
+    Returns:
+        Dict with multiple_sources=True and results array
+    """
+    # 清理词语（与 lookup_word 相同的逻辑）
+    word = word.strip()
+    word = word.replace("\u2019", "'").replace("\u2018", "'")
+    while word and word[-1] in ".,!?;:":
+        word = word[:-1]
+    while word and word[0] in ".,!?;:\"'(":
+        word = word[1:]
+
+    contraction_suffixes = ("n't", "'m", "'re", "'ve", "'ll", "'d")
+    is_contraction = any(word.lower().endswith(suffix) for suffix in contraction_suffixes)
+    contraction_words = {
+        "it's", "that's", "what's", "who's", "there's", "here's", "let's",
+        "he's", "she's", "how's", "where's", "when's", "why's",
+    }
+    is_contraction = is_contraction or word.lower() in contraction_words
+
+    if word.endswith("'s") and not is_contraction:
+        word = word[:-2]
+
+    if not word:
+        return None
+
+    original_word = word
+
+    # 获取所有启用的词典
+    dict_manager = get_dict_manager()
+    try:
+        dicts = dict_manager.get_dicts()
+        # 过滤出启用的导入词典（排除 ECDICT）
+        active_imported_dicts = [
+            d["name"] for d in dicts
+            if d.get("type") == "imported" and d.get("is_active", True)
+        ]
+
+        if not active_imported_dicts:
+            # 没有启用的导入词典，直接跳过，后续会回退到 ECDICT
+            pass
+
+        # 查询所有启用的词典
+        results = []
+        for dict_name in active_imported_dicts:
+            try:
+                result = dict_manager.lookup_word(word, source=dict_name)
+                if result:
+                    # 添加 ECDICT 翻译和音标
+                    ecdict_data = ecdict_service.get_word_details(word)
+                    if ecdict_data:
+                        if ecdict_data.get("translation"):
+                            result["chinese_translation"] = ecdict_data["translation"]
+                        if ecdict_data.get("phonetic"):
+                            result["phonetic"] = ecdict_data["phonetic"]
+                    results.append({
+                        "source_label": dict_name,
+                        "source": dict_name,
+                        **result
+                    })
+            except Exception as e:
+                logger.warning(f"Failed to lookup in {dict_name}: {e}")
+                continue
+
+        if not results:
+            # 所有导入词典都没找到，返回 ECDICT 结果
+            ecdict_data = ecdict_service.get_word_details(word)
+            if ecdict_data:
+                return {
+                    "word": ecdict_data.get("word"),
+                    "phonetic": ecdict_data.get("phonetic"),
+                    "chinese_translation": ecdict_data.get("translation"),
+                    "source": "ECDICT",
+                    "is_ecdict": True,
+                    "raw_data": ecdict_data,
+                    "meanings": [{
+                        "partOfSpeech": ecdict_data.get("pos"),
+                        "definitions": [{"definition": ecdict_data.get("definition", ""), "translation": ecdict_data.get("translation")}]
+                    }]
+                }
+            return None
+
+        # 只有一个词典有结果，直接返回（使用单词典模式）
+        if len(results) == 1:
+            return results[0]
+
+        # 多个词典有结果，返回聚合模式
+        # 单独查询 ECDICT 获取中文翻译和音标，而不是依赖词典结果
+        ecdict_for_multi = ecdict_service.get_word_details(original_word)
+        chinese_translation = ecdict_for_multi.get("translation") if ecdict_for_multi else None
+        phonetic = ecdict_for_multi.get("phonetic") if ecdict_for_multi else None
+        
+        # 如果 ECDICT 没有找到，尝试从第一个词典结果获取
+        if not chinese_translation and results:
+            chinese_translation = results[0].get("chinese_translation")
+        if not phonetic and results:
+            phonetic = results[0].get("phonetic")
+            
+        return {
+            "word": original_word,
+            "multiple_sources": True,
+            "results": results,
+            "phonetic": phonetic,
+            "chinese_translation": chinese_translation,
+        }
+
+    except Exception as e:
+        logger.error(f"Error in lookup_word_all_sources: {e}")
+        # 发生错误时，回退到 ECDICT 直接查询
+        return ecdict_service.get_word_details(original_word)
+
+
 def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optional[Dict]:
     """Look up word in dictionary (cache -> local mdx -> gemini -> internet)
 
@@ -355,7 +473,16 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
         db: Database session
         word: Word to look up
         source: Optional dictionary source to prefer
+
+    Note:
+        - If source is None, queries ALL active dictionaries and returns aggregated results
+        - If source is specified (including empty string), only queries that specific dictionary
     """
+    # 如果 source 是 None，使用多词典聚合查询
+    # 空字符串被视为有效的 source 值（表示默认词典）
+    if source is None:
+        return lookup_word_all_sources(db, word)
+
     # 清理词语
     word = word.strip()
 

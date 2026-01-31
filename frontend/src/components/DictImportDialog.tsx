@@ -3,7 +3,7 @@ import { importDict } from '../lib/api';
 
 interface DictImportDialogProps {
   onClose: () => void;
-  onImportComplete?: () => void;
+  onImportComplete?: (dictName: string) => void;
 }
 
 export function DictImportDialog({ onClose, onImportComplete }: DictImportDialogProps) {
@@ -11,6 +11,7 @@ export function DictImportDialog({ onClose, onImportComplete }: DictImportDialog
   const [name, setName] = useState('');
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [importPhase, setImportPhase] = useState<'uploading' | 'parsing' | 'done'>('uploading');
   const [error, setError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,19 +32,26 @@ export function DictImportDialog({ onClose, onImportComplete }: DictImportDialog
     }
 
     setImporting(true);
+    setImportPhase('uploading');
     setProgress(0);
     setError('');
 
     try {
       await importDict(file, name || undefined, (percent) => {
-        setProgress(Math.round(percent));
+        const pct = Math.round(percent);
+        setProgress(pct);
+        if (pct >= 100) {
+          setImportPhase('parsing');
+        }
       });
       // Ensure it hits 100% on completion
       setProgress(100);
+      setImportPhase('parsing');
 
       setTimeout(() => {
         setImporting(false);
-        onImportComplete?.();
+        setImportPhase('done');
+        onImportComplete?.(name || file.name.replace(/\.(mdx|zip)$/i, ''));
         onClose();
       }, 500);
     } catch (error: any) {
@@ -119,15 +127,26 @@ export function DictImportDialog({ onClose, onImportComplete }: DictImportDialog
           {importing && (
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span>导入中...</span>
+                <span className="font-medium text-blue-600">
+                  {importPhase === 'parsing' ? '正在解析词典...' : '正在上传文件...'}
+                </span>
                 <span>{progress}%</span>
               </div>
-              <div className="h-2 bg-gray-200 rounded">
+              <div className="h-2 bg-gray-200 rounded overflow-hidden">
                 <div
-                  className="h-2 bg-blue-500 rounded transition-all"
+                  className={`h-2 rounded transition-all duration-300 ${
+                    importPhase === 'parsing' 
+                      ? 'bg-blue-500 w-full animate-pulse' 
+                      : 'bg-blue-500'
+                  }`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
+              {importPhase === 'parsing' && (
+                <p className="text-xs text-gray-500 mt-2 text-center animate-pulse">
+                  正在建立索引，大文件可能需要几分钟，请勿关闭...
+                </p>
+              )}
             </div>
           )}
 

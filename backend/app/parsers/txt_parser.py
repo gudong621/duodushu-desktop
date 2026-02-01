@@ -8,8 +8,11 @@ class TXTParser(BaseParser):
     def parse(self, file_path: str, book_id: str) -> Dict[str, Any]:
         """解析 TXT 文件"""
 
+        logger.info(f"[TXTParser] 开始解析文件: {file_path}")
+
         # 尝试多种编码
         content = self._read_file_with_encoding(file_path)
+        logger.info(f"[TXTParser] 文件内容长度: {len(content) if content else 0}")
 
         if not content:
             raise Exception("无法读取 TXT 文件（编码问题）")
@@ -81,9 +84,7 @@ class TXTParser(BaseParser):
         max_x = 800
 
         for word in words:
-            words_data.append(
-                {"text": word, "x": x, "y": y, "width": len(word) * 10, "height": 20}
-            )
+            words_data.append({"text": word, "x": x, "y": y, "width": len(word) * 10, "height": 20})
 
             x += len(word) * 10 + 10
             if x > max_x:

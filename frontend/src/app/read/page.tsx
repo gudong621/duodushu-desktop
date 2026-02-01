@@ -296,6 +296,7 @@ function ReaderContent() {
     };
     setNotes((prev) => [newNote, ...prev]);
     setSidebarMode("notes");
+    setRightSidebarCollapsed(false); // 自动展开右侧栏
   };
 
   const handleDeleteNote = (noteId: string) => {
@@ -468,6 +469,7 @@ function ReaderContent() {
   const handleAskAI = (text: string) => {
     setSidebarMode("ai");
     setAiQuestion(`请讲解一下这段内容：\n\n"${text}"`);
+    setRightSidebarCollapsed(false); // 自动展开右侧栏
   };
 
   // Handle Search / Lookup
@@ -481,6 +483,7 @@ function ReaderContent() {
 
       // Auto-switch to dictionary tab
       setSidebarMode("dictionary");
+      setRightSidebarCollapsed(false); // 自动展开右侧栏
 
       // Strip punctuation
       const word = rawWord

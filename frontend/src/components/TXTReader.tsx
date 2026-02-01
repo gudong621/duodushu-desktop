@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 
 interface TXTReaderProps {
   textContent?: string;
@@ -19,10 +19,24 @@ export default function TXTReader({
     return textContent.match(/([a-zA-ZÀ-ÿ]+(?:[''s]*[a-zA-Z]+)*|[.,;:!?""''()\[\]{}—-]+)/g) || [];
   }, [textContent]);
 
-  if (!textContent || tokens.length === 0) {
+  // 调试日志
+  useEffect(() => {
+    console.log('[TXTReader] textContent:', textContent);
+    console.log('[TXTReader] tokens.length:', tokens.length);
+  }, [textContent, tokens.length]);
+
+  if (!textContent) {
     return (
       <div className="flex items-center justify-center h-full text-gray-400">
-        <p>暂无内容</p>
+        <p>正在加载内容...</p>
+      </div>
+    );
+  }
+
+  if (tokens.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400">
+        <p>文本为空或无法解析</p>
       </div>
     );
   }

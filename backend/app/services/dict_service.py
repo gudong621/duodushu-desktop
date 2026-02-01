@@ -369,8 +369,19 @@ def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
     contraction_suffixes = ("n't", "'m", "'re", "'ve", "'ll", "'d")
     is_contraction = any(word.lower().endswith(suffix) for suffix in contraction_suffixes)
     contraction_words = {
-        "it's", "that's", "what's", "who's", "there's", "here's", "let's",
-        "he's", "she's", "how's", "where's", "when's", "why's",
+        "it's",
+        "that's",
+        "what's",
+        "who's",
+        "there's",
+        "here's",
+        "let's",
+        "he's",
+        "she's",
+        "how's",
+        "where's",
+        "when's",
+        "why's",
     }
     is_contraction = is_contraction or word.lower() in contraction_words
 
@@ -387,10 +398,7 @@ def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
     try:
         dicts = dict_manager.get_dicts()
         # 过滤出启用的导入词典（排除 ECDICT）
-        active_imported_dicts = [
-            d["name"] for d in dicts
-            if d.get("type") == "imported" and d.get("is_active", True)
-        ]
+        active_imported_dicts = [d["name"] for d in dicts if d.get("type") == "imported" and d.get("is_active", True)]
 
         if not active_imported_dicts:
             # 没有启用的导入词典，直接跳过，后续会回退到 ECDICT
@@ -409,11 +417,7 @@ def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
                             result["chinese_translation"] = ecdict_data["translation"]
                         if ecdict_data.get("phonetic"):
                             result["phonetic"] = ecdict_data["phonetic"]
-                    results.append({
-                        "source_label": dict_name,
-                        "source": dict_name,
-                        **result
-                    })
+                    results.append({"source_label": dict_name, "source": dict_name, **result})
             except Exception as e:
                 logger.warning(f"Failed to lookup in {dict_name}: {e}")
                 continue
@@ -429,10 +433,17 @@ def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
                     "source": "ECDICT",
                     "is_ecdict": True,
                     "raw_data": ecdict_data,
-                    "meanings": [{
-                        "partOfSpeech": ecdict_data.get("pos"),
-                        "definitions": [{"definition": ecdict_data.get("definition", ""), "translation": ecdict_data.get("translation")}]
-                    }]
+                    "meanings": [
+                        {
+                            "partOfSpeech": ecdict_data.get("pos"),
+                            "definitions": [
+                                {
+                                    "definition": ecdict_data.get("definition", ecdict_data.get("translation", "")),
+                                    "translation": ecdict_data.get("translation"),
+                                }
+                            ],
+                        }
+                    ],
                 }
             return None
 
@@ -445,13 +456,13 @@ def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
         ecdict_for_multi = ecdict_service.get_word_details(original_word)
         chinese_translation = ecdict_for_multi.get("translation") if ecdict_for_multi else None
         phonetic = ecdict_for_multi.get("phonetic") if ecdict_for_multi else None
-        
+
         # 如果 ECDICT 没有找到，尝试从第一个词典结果获取
         if not chinese_translation and results:
             chinese_translation = results[0].get("chinese_translation")
         if not phonetic and results:
             phonetic = results[0].get("phonetic")
-            
+
         return {
             "word": original_word,
             "multiple_sources": True,
@@ -572,7 +583,11 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
                         lemma_cn_translation = ecdict_service.get_translation(lemma)
                         if lemma_cn_translation:
                             lemma_result["chinese_translation"] = lemma_cn_translation
-                        lemma_phonetic = ecdict_service.get_word_details(lemma).get("phonetic") if ecdict_service.get_word_details(lemma) else None
+                        lemma_phonetic = (
+                            ecdict_service.get_word_details(lemma).get("phonetic")
+                            if ecdict_service.get_word_details(lemma)
+                            else None
+                        )
                         if lemma_phonetic:
                             lemma_result["phonetic"] = lemma_phonetic
                         return lemma_result
@@ -589,18 +604,15 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
             "chinese_translation": cn_translation,
             "source": "ECDICT",
             "is_ecdict": True,
-            "raw_data": ecdict_data, # Pass everything for user inspection
+            "raw_data": ecdict_data,  # Pass everything for user inspection
             "meanings": [
                 {
                     "partOfSpeech": ecdict_data.get("pos"),
-                    "definitions": [
-                        {"definition": ecdict_data.get("definition", ""), "translation": cn_translation}
-                    ]
+                    "definitions": [{"definition": ecdict_data.get("definition", ""), "translation": cn_translation}],
                 }
-            ]
+            ],
         }
         return result
-
 
     # 3. Search Database (Cache/Gemini generated)
     if not source or source == "AI":

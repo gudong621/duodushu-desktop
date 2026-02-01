@@ -654,7 +654,7 @@ function DictionarySidebar({
                   word={wordData.word}
                   source={wordData.source || activeTab}
                   htmlContent={wordData.html_content!}
-                  rawData={wordData.source === 'ECDICT' || (wordData as any).is_ecdict ? (wordData as any).raw_data : undefined}
+                  rawData={wordData.source?.toLowerCase() === 'ecdict' || (wordData as any).is_ecdict ? (wordData as any).raw_data : undefined}
                 />
               </div>
             ) : wordData.meanings && wordData.meanings.length > 0 ? (

@@ -15,20 +15,47 @@ export default function Home() {
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [pollingError, setPollingError] = useState<string | null>(null);
   const [hoveredBookId, setHoveredBookId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchBooks = React.useCallback(async (isPolling = false) => {
-    try {
-      const data = await getBooks();
-      setBooks(data);
-      if (isPolling && pollingError) {
-        setPollingError(null); // Clear error if fetch succeeds during polling
-      }
-    } catch (error) {
-      console.error('Failed to load books:', error);
-      if (isPolling) {
-        setPollingError('同步失败，请刷新页面');
+    if (!isPolling) {
+      setIsLoading(true);
+      setError(null);
+    }
+
+    const maxRetries = isPolling ? 1 : 5;
+    let attempt = 0;
+    let loaded = false;
+
+    while (attempt < maxRetries && !loaded) {
+      try {
+        const data = await getBooks();
+        setBooks(data);
+        if (isPolling && pollingError) {
+          setPollingError(null); // Clear error if fetch succeeds during polling
+        }
+        if (!isPolling) {
+          setIsLoading(false);
+        }
+        loaded = true;
+      } catch (err) {
+        attempt++;
+        console.error(`Failed to load books (attempt ${attempt}/${maxRetries}):`, err);
+        
+        if (attempt >= maxRetries) {
+          if (isPolling) {
+            setPollingError('同步失败，请刷新页面');
+          } else {
+            setError('连接服务器失败，请确保后台服务已启动');
+            setIsLoading(false);
+          }
+        } else {
+          // Wait before retry (exponential backoff: 500, 1000, 2000, 4000ms)
+          await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+        }
       }
     }
   }, [pollingError]);
@@ -168,105 +195,133 @@ export default function Home() {
         <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">我的书架</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {books.map((book) => (
-              <div
-                key={book.id}
-                className="bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-md transition-all h-full flex flex-col relative group"
-                onMouseEnter={() => setHoveredBookId(book.id)}
-                onMouseLeave={() => setHoveredBookId(null)}
-              >
-                <Link href={`/read?id=${book.id}`} className="h-full flex flex-col flex-1">
-                  <div className="relative w-full pb-[133.33%] bg-gray-100 overflow-hidden">
-                    {book.cover_image ? (
-                        <img
-                            src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/books/cover/${book.cover_image}`}
-                            alt={book.title}
-                            className="absolute inset-0 w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                        No Cover
-                        </div>
-                    )}
-
-                    {/* 右上角删除按钮（hover显示） */}
-                    <button
-                      onClick={(e) => handleDelete(e, book.id)}
-                      className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900 hover:border-gray-400 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                      title="删除书籍"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-
-                    {/* 右下角心形图标 */}
-                    {hoveredBookId === book.id ? (
-                      <button
-                        onClick={(e) => toggleBookType(book.id, e)}
-                        className="absolute bottom-2 right-2 p-1.5 transition-all z-10 hover:scale-110"
-                        title={book.book_type === 'example_library' ? '取消例句库' : '设为例句库'}
-                      >
-                        <svg
-                          className={`w-5 h-5 transition-colors ${
-                            book.book_type === 'example_library'
-                              ? 'fill-gray-400/60 text-gray-400/60'
-                              : 'text-gray-400/40'
-                          }`}
-                          fill={book.book_type === 'example_library' ? 'currentColor' : 'none'}
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          strokeWidth={book.book_type === 'example_library' ? 0 : 2}
+            {isLoading ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
+                <svg className="w-10 h-10 animate-spin mb-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p>正在加载书架...</p>
+              </div>
+            ) : error ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
+                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <p className="text-lg font-medium text-gray-900 mb-2">加载失败</p>
+                <p className="mb-6">{error}</p>
+                <button
+                  onClick={() => fetchBooks(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  重试
+                </button>
+              </div>
+            ) : (
+              <>
+                {books.map((book) => (
+                  <div
+                    key={book.id}
+                    className="bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-md transition-all h-full flex flex-col relative group"
+                    onMouseEnter={() => setHoveredBookId(book.id)}
+                    onMouseLeave={() => setHoveredBookId(null)}
+                  >
+                    <Link href={`/read?id=${book.id}`} className="h-full flex flex-col flex-1">
+                      <div className="relative w-full pb-[133.33%] bg-gray-100 overflow-hidden">
+                        {book.cover_image ? (
+                            <img
+                                src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/books/cover/${book.cover_image}`}
+                                alt={book.title}
+                                className="absolute inset-0 w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                            No Cover
+                            </div>
+                        )}
+    
+                        {/* 右上角删除按钮（hover显示） */}
+                        <button
+                          onClick={(e) => handleDelete(e, book.id)}
+                          className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900 hover:border-gray-400 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          title="删除书籍"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                      </button>
-                    ) : (
-                      // 非hover状态，只显示静态图标（例句库显示红色心）
-                      <div className="absolute bottom-2 right-2">
-                        {book.book_type === 'example_library' && (
-                          <div className="p-1.5">
-                            <svg className="w-5 h-5 text-gray-400/40 fill-current" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+    
+                        {/* 右下角心形图标 */}
+                        {hoveredBookId === book.id ? (
+                          <button
+                            onClick={(e) => toggleBookType(book.id, e)}
+                            className="absolute bottom-2 right-2 p-1.5 transition-all z-10 hover:scale-110"
+                            title={book.book_type === 'example_library' ? '取消例句库' : '设为例句库'}
+                          >
+                            <svg
+                              className={`w-5 h-5 transition-colors ${
+                                book.book_type === 'example_library'
+                                  ? 'fill-gray-400/60 text-gray-400/60'
+                                  : 'text-gray-400/40'
+                              }`}
+                              fill={book.book_type === 'example_library' ? 'currentColor' : 'none'}
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              strokeWidth={book.book_type === 'example_library' ? 0 : 2}
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                             </svg>
+                          </button>
+                        ) : (
+                          // 非hover状态，只显示静态图标（例句库显示红色心）
+                          <div className="absolute bottom-2 right-2">
+                            {book.book_type === 'example_library' && (
+                              <div className="p-1.5">
+                                <svg className="w-5 h-5 text-gray-400/40 fill-current" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                </svg>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                  <div className="p-4 flex-1">
-                    <h3 className="font-medium text-gray-900 group-hover:text-gray-700 truncate" title={book.title}>
-                      {book.title}
-                    </h3>
-                    {/* 书籍信息 */}
-                    <div className="mt-2 flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500">
-                          {book.format.toUpperCase()}
-                          {book.total_pages && ` · ${book.total_pages}页`}
-                        </span>
-                        {book.book_type === 'example_library' && hoveredBookId === book.id && (
-                          <span className="text-xs text-gray-400">
-                            ♥ 例句库
-                          </span>
-                        )}
+                      <div className="p-4 flex-1">
+                        <h3 className="font-medium text-gray-900 group-hover:text-gray-700 truncate" title={book.title}>
+                          {book.title}
+                        </h3>
+                        {/* 书籍信息 */}
+                        <div className="mt-2 flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500">
+                              {book.format.toUpperCase()}
+                              {book.total_pages && ` · ${book.total_pages}页`}
+                            </span>
+                            {book.book_type === 'example_library' && hoveredBookId === book.id && (
+                              <span className="text-xs text-gray-400">
+                                ♥ 例句库
+                              </span>
+                            )}
+                          </div>
+                          {book.status !== 'completed' && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium
+                              ${book.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                'bg-blue-100 text-blue-700'}`}>
+                              {book.status}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {book.status !== 'completed' && (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium
-                          ${book.status === 'failed' ? 'bg-red-100 text-red-700' :
-                            'bg-blue-100 text-blue-700'}`}>
-                          {book.status}
-                        </span>
-                      )}
-                    </div>
+                    </Link>
                   </div>
-                </Link>
-              </div>
-            ))}
-            {books.length === 0 && (
-              <div className="col-span-full text-center py-12 text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
-                暂无书籍，快上传一本开始阅读吧！
-              </div>
+                ))}
+                {books.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-gray-400 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                    暂无书籍，快上传一本开始阅读吧！
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>

@@ -1,9 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-// 通过 IPC 获取后端 URL
-let cachedBackendUrl: string | null = null;
+// 预定义默认后端 URL（用于便携版）
+const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
 
-// 初始化时获取一次后端 URL
+// 获取后端 URL（优先使用预定义的 URL，避免 IPC 问题）
+let cachedBackendUrl = DEFAULT_BACKEND_URL;
+
+// 初始化时尝试获取一次后端 URL（如果 Electron 主进程提供了）
 ipcRenderer.invoke('get-backend-url').then((url: string) => {
   cachedBackendUrl = url;
   console.log('[Preload] Backend URL received:', url);
@@ -12,19 +15,25 @@ ipcRenderer.invoke('get-backend-url').then((url: string) => {
 });
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // 从主进程获取后端 URL
+  // 获取后端 URL
   getBackendUrl: async () => {
-    if (cachedBackendUrl) {
+    // 优先使用缓存的 URL
+    if (cachedBackendUrl && cachedBackendUrl !== DEFAULT_BACKEND_URL) {
       return cachedBackendUrl;
     }
+    // 如果 Electron 主进程提供了自定义 URL，使用它
     try {
       const url = await ipcRenderer.invoke('get-backend-url');
-      cachedBackendUrl = url;
-      return url;
+      if (url && url !== DEFAULT_BACKEND_URL) {
+        cachedBackendUrl = url;
+        console.log('[Preload] Updated backend URL:', url);
+        return url;
+      }
     } catch (err) {
       console.error('[Preload] Failed to get backend URL:', err);
-      return 'http://127.0.0.1:8000';
     }
+    // 回退到默认值
+    return DEFAULT_BACKEND_URL;
   },
 
   // 示例：从渲染进程发送消息到主进程

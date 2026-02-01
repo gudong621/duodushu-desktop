@@ -444,53 +444,126 @@ POST /api/ai/translate
 }
 ```
 
-## 8. 设置 API
+## 8. 配置 API
 
-### 获取设置
+### 获取所有供应商
 
 ```
-GET /api/settings
+GET /api/config/suppliers
 ```
 
 **响应示例**:
 ```json
 {
-  "theme": "light",
-  "font_size": 14,
-  "line_height": 1.5,
-  "api_key": "sk-***",
-  "language": "en"
+  "suppliers": [
+    {
+      "type": "gemini",
+      "name": "Google Gemini",
+      "description": "Google的AI模型服务",
+      "model_count": 4,
+      "requires_endpoint": false
+    }
+  ]
 }
 ```
 
-### 更新设置
+### 获取供应商模型列表
 
 ```
-PUT /api/settings
+GET /api/config/suppliers/{supplier_type}/models
+```
+
+**路径参数**:
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `supplier_type` | str | 供应商类型 (gemini/openai/claude/deepseek/qwen/custom) |
+
+**响应示例**:
+```json
+{
+  "supplier_type": "gemini",
+  "models": [
+    {
+      "id": "gemini-3-pro-preview",
+      "name": "Gemini 3 Pro",
+      "description": "Google最新一代顶级高性能模型",
+      "context_length": 2000000
+    }
+  ]
+}
+```
+
+### 获取供应商配置状态
+
+```
+GET /api/config/suppliers-status
+```
+
+**响应示例**:
+```json
+{
+  "suppliers": [
+    {
+      "type": "gemini",
+      "name": "Google Gemini",
+      "configured": true,
+      "model": "gemini-3-pro-preview",
+      "is_active": true
+    }
+  ],
+  "active_supplier": "gemini"
+}
+```
+
+### 保存供应商配置
+
+```
+POST /api/config/suppliers
 ```
 
 **请求体**:
 ```json
 {
-  "theme": "dark",
-  "font_size": 16,
-  "line_height": 1.8,
-  "api_key": "sk-new-key"
+  "supplier_type": "gemini",
+  "api_key": "your-api-key",
+  "model": "gemini-3-pro-preview",
+  "custom_model": "",
+  "api_endpoint": ""
 }
 ```
 
-**响应示例**:
+### 设置活跃供应商
+
+```
+POST /api/config/set-active-supplier
+```
+
+**请求体**:
 ```json
 {
-  "message": "Settings updated successfully",
-  "settings": {
-    "theme": "dark",
-    "font_size": 16,
-    "line_height": 1.8,
-    "api_key": "sk-***",
-    "language": "en"
-  }
+  "supplier_type": "gemini"
 }
+```
+
+### 测试连接
+
+```
+POST /api/config/test-connection
+```
+
+**请求体**:
+```json
+{
+  "supplier_type": "gemini",
+  "api_key": "your-api-key",
+  "model": "gemini-3-pro-preview"
+}
+```
+
+### 删除供应商配置
+
+```
+DELETE /api/config/suppliers/{supplier_type}
 ```
 
 ## 9. 错误响应

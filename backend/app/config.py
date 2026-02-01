@@ -70,6 +70,12 @@ def get_resource_path(filename: str, fallback_path: Path) -> Path:
             logger.info(f"从打包资源目录加载: {fallback_from_base}")
             return fallback_from_base
 
+        # 特殊处理：如果在根目录找不到，尝试 _internal 子目录（Electron 打包结构）
+        internal_path = Path(sys._MEIPASS) / "_internal" / filename
+        if internal_path.exists():
+            logger.info(f"从 _internal 目录加载: {internal_path}")
+            return internal_path
+
     # 3. 最后回退到传入的 fallback_path（开发环境）
     return fallback_path
 

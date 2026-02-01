@@ -27,7 +27,8 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 datas += [('app', 'app')]
 
 # 确保 ecdict.db 被包含到打包目录的根级别（get_resource_path 会查找）
-datas += [('static/ecdict.db', '.')]  # 放到打包根目录
+import os
+datas += [(os.path.abspath('static/ecdict.db'), '.')]  # 使用绝对路径，放到打包根目录
 tmp_ret = collect_all('uvicorn')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('sqlalchemy')

@@ -31,16 +31,20 @@ CONFIG_FILE = DATA_DIR / "app_config.json"
 
 # ========== 旧版配置模型（向后兼容）==========
 
+
 class APIKeysConfig(BaseModel):
     """API Keys 配置模型（旧版，向后兼容）"""
+
     gemini_api_key: str = ""
     deepseek_api_key: str = ""
 
 
 # ========== 新版配置模型 ==========
 
+
 class SupplierConfigRequest(BaseModel):
     """供应商配置请求模型"""
+
     supplier_type: str = Field(..., description="供应商类型")
     api_key: str = Field(..., description="API密钥")
     model: str = Field(default="", description="选择的模型ID")
@@ -50,6 +54,7 @@ class SupplierConfigRequest(BaseModel):
 
 class TestConnectionRequest(BaseModel):
     """测试连接请求模型"""
+
     supplier_type: str = Field(..., description="供应商类型")
     api_key: str = Field(..., description="API密钥")
     api_endpoint: str = Field(default="", description="API端点（仅自定义供应商需要）")
@@ -58,10 +63,12 @@ class TestConnectionRequest(BaseModel):
 
 class SetActiveSupplierRequest(BaseModel):
     """设置活跃供应商请求模型"""
+
     supplier_type: str = Field(..., description="要设置为活跃的供应商类型")
 
 
 # ========== 配置文件操作 ==========
+
 
 def load_config() -> dict:
     """加载配置文件"""
@@ -181,6 +188,7 @@ def _update_env_variables(multi_config: MultiSupplierConfig) -> None:
 
 # ========== 旧版API端点（向后兼容）==========
 
+
 @router.get("/api-keys")
 def get_api_keys():
     """获取 API keys 配置（旧版API，向后兼容）"""
@@ -202,7 +210,7 @@ def save_api_keys(keys: APIKeysConfig):
     # Merge new keys into config
     if "api_keys" not in config:
         config["api_keys"] = {}
-        
+
     if keys.gemini_api_key:
         config["api_keys"]["gemini_api_key"] = keys.gemini_api_key
     if keys.deepseek_api_key:
@@ -210,29 +218,27 @@ def save_api_keys(keys: APIKeysConfig):
 
     try:
         save_config(config)
-        
+
         # Also sync to new multi-supplier config format
         # This ensures that if the user switches to the new UI, the keys are there
         multi_config = load_multi_supplier_config()
-        
+
         if keys.gemini_api_key:
-            multi_config.add_or_update_supplier(SupplierConfig(
-                supplier_type=SupplierType.GEMINI,
-                name="Google Gemini",
-                api_key=keys.gemini_api_key,
-                enabled=True
-            ))
-            
+            multi_config.add_or_update_supplier(
+                SupplierConfig(
+                    supplier_type=SupplierType.GEMINI, name="Google Gemini", api_key=keys.gemini_api_key, enabled=True
+                )
+            )
+
         if keys.deepseek_api_key:
-            multi_config.add_or_update_supplier(SupplierConfig(
-                supplier_type=SupplierType.DEEPSEEK,
-                name="DeepSeek",
-                api_key=keys.deepseek_api_key,
-                enabled=True
-            ))
-            
+            multi_config.add_or_update_supplier(
+                SupplierConfig(
+                    supplier_type=SupplierType.DEEPSEEK, name="DeepSeek", api_key=keys.deepseek_api_key, enabled=True
+                )
+            )
+
         save_multi_supplier_config(multi_config)
-        
+
     except Exception as e:
         logger.error(f"Failed to save key config: {e}")
         raise HTTPException(status_code=500, detail="Configuration save failed")
@@ -254,6 +260,7 @@ def save_api_keys(keys: APIKeysConfig):
 
 
 # ========== 新版API端点 ==========
+
 
 @router.get("/suppliers")
 def get_suppliers():
@@ -289,15 +296,17 @@ def get_suppliers_status():
             supplier_type = SupplierType(supplier_type_str)
             config = multi_config.suppliers.get(supplier_type)
 
-            status.append({
-                "type": supplier_type_str,
-                "name": supplier_info["name"],
-                "configured": config is not None and config.enabled,
-                "model": config.model if config else "",
-                "custom_model": config.custom_model if config else "",
-                "api_endpoint": config.api_endpoint if config else "",
-                "is_active": config.is_active if config else False,
-            })
+            status.append(
+                {
+                    "type": supplier_type_str,
+                    "name": supplier_info["name"],
+                    "configured": config is not None and config.enabled,
+                    "model": config.model if config else "",
+                    "custom_model": config.custom_model if config else "",
+                    "api_endpoint": config.api_endpoint if config else "",
+                    "is_active": config.is_active if config else False,
+                }
+            )
         except ValueError:
             continue
 
@@ -323,6 +332,7 @@ def save_supplier_config(request: SupplierConfigRequest):
 
     # 获取供应商预设信息
     from app.supplier_config import SUPPLIER_PRESETS
+
     preset = SUPPLIER_PRESETS.get(supplier_type, {})
 
     # 创建或更新供应商配置
@@ -415,6 +425,7 @@ async def test_connection(request: TestConnectionRequest):
     # 导入测试服务（稍后实现）
     try:
         from app.services.supplier_test_service import test_supplier_connection
+
         result = await test_supplier_connection(
             supplier_type=supplier_type,
             api_key=request.api_key,
@@ -429,6 +440,22 @@ async def test_connection(request: TestConnectionRequest):
             "message": "连接测试功能即将推出",
             "supplier_type": request.supplier_type,
         }
+
+
+@router.post("/reload")
+def reload_config():
+    """重新加载配置"""
+    from ..services import supplier_factory
+
+    try:
+        # 重新加载配置
+        factory = supplier_factory.get_supplier_factory()
+        factory.reload_config()
+
+        return {"status": "success", "message": "配置已重新加载"}
+    except Exception as e:
+        logger.error(f"重新加载配置失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/")

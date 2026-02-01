@@ -16,6 +16,9 @@ class TXTParser(BaseParser):
         # 尝试多种编码
         content = self._read_file_with_encoding(file_path)
         logger.info(f"[TXTParser] 文件内容长度: {len(content) if content else 0}")
+        logger.info(
+            f"[TXTParser] 预计段落数（按双换行分割）：{len(content.split(chr(10) + chr(10))) if content else 0}"
+        )
 
         if not content:
             raise Exception("无法读取 TXT 文件（编码问题）")
@@ -30,6 +33,8 @@ class TXTParser(BaseParser):
         # 每段作为一个"页面"
         pages_data = []
         total_pages = len(paragraphs)
+
+        logger.info(f"[TXTParser] 实际段落数量: {total_pages}")
 
         for i, paragraph in enumerate(paragraphs):
             words_data = self._extract_words_from_text(paragraph, i + 1)
@@ -52,12 +57,17 @@ class TXTParser(BaseParser):
         # TXT 没有封面
         cover_image = None
 
-        return {
+        result = {
             **metadata,
             "pages": pages_data,
             "cover_image": cover_image,
             "outline": [],  # TXT 没有目录
         }
+
+        logger.info(
+            f"[TXTParser] 解析完成 - 段落: {total_pages}, 第一段长度: {len(pages_data[0]['text_content']) if pages_data else 0}"
+        )
+        return result
 
     def _read_file_with_encoding(self, file_path: str) -> str:
         """尝试多种编码读取文件"""

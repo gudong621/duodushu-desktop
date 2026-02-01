@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多读书桌面版 - 沉浸式英语学习工作站</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Add Chinese Font Support */
+        body {
+            font-family: 'Inter', 'Noto Sans SC', sans-serif;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            font-family: 'Outfit', 'Noto Sans SC', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Ambient Background -->
+    <div class="bg-glow">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <img src="logo.png" alt="Duodushu Logo" class="logo-img"> Duodushu 多读书
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">功能特性</a></li>
+                <li><a href="#comparison">版本对比</a></li>
+                <li><a href="https://github.com/angelwdx/duodushu-desktop" target="_blank"><i
+                            class="fa-brands fa-github"></i> GitHub</a></li>
+            </ul>
+
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container hero-content">
+            <h1>打造你的沉浸式<br>英语学习工作站</h1>
+            <p class="hero-subtitle">
+                一款<strong>本地优先、隐私至上</strong>的桌面应用，专为深度学习者打造。<br>
+                自带书籍，掌控数据，享受无干扰的纯粹阅读。
+            </p>
+            <div class="hero-actions">
+                <a href="#download" class="btn-primary"><i class="fa-brands fa-windows"></i> Windows 版下载</a>
+                <a href="#features" class="btn-glass">探索功能</a>
+            </div>
+
+            <!-- Optional: Hero Image Placeholder -->
+            <div
+                style="margin-top: 3rem; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid var(--glass-border); height: 400px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+                <p style="color: var(--text-muted);"><i class="fa-solid fa-image"></i> 应用截图占位符</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="section">
+        <div class="container">
+            <h2>为什么选择桌面版？</h2>
+            <div class="features-grid">
+                <!-- Card 1: Portable -->
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-box-archive"></i></div>
+                    <h3>绿色便携 (Portable)</h3>
+                    <p>无需安装，解压即用。即插即用的 U 盘模式，让你的书库、笔记和学习记录随身携带，换电脑也无需迁移。</p>
+                </div>
+
+                <!-- Card 2: Privacy -->
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <h3>100% 隐私安全</h3>
+                    <p>你的书籍、笔记、阅读数据完全存储在本地。没有云端上传，没有后台追踪，完全由你掌控。</p>
+                </div>
+
+                <!-- Card 3: AI Power -->
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                    <h3>BYO AI Key</h3>
+                    <p>支持绑定你自己的 API Key。按需付费，直连服务商，享受无限量的 AI 翻译与深度解析。</p>
+                </div>
+
+                <!-- Card 4: Instant Lookup -->
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-hand-pointer"></i></div>
+                    <h3>即点即查</h3>
+                    <p>阅读时不被打断。点击任意单词即刻查看释义。支持记笔记、AI 深度解析，让生词不再是阅读的拦路虎。</p>
+                </div>
+
+                <!-- Card 5: MDX Dictionary -->
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-book-journal-whills"></i></div>
+                    <h3>MDX 词典支持</h3>
+                    <p>兼容你的专业词库。支持直接导入 MDX 格式词典，丰富的词典资源，按需加载。</p>
+                </div>
+
+                <!-- Card 6: Context Memory -->
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fa-solid fa-brain"></i></div>
+                    <h3>场景记忆 & 例句库</h3>
+                    <p>看过的书就是你的例句库。复习单词时，系统会自动回溯该单词在你读过的书中出现的原句，帮你重现语境记忆。</p>
+                </div>
+
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section id="comparison" class="section">
+        <div class="container">
+            <h2>Web 版 vs 桌面版</h2>
+            <div class="comparison-table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>功能特性</th>
+                            <th>Web/Docker 版</th>
+                            <th>桌面便携版</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>部署方式</td>
+                            <td>服务器 / Docker 容器</td>
+                            <td><strong>解压即用 (.zip)</strong></td>
+                        </tr>
+                        <tr>
+                            <td>数据存储</td>
+                            <td>服务器数据库 / 云端</td>
+                            <td><strong>本地文件夹 (Portable)</strong></td>
+                        </tr>
+                        <tr>
+                            <td>离线访问</td>
+                            <td>依赖网络连接</td>
+                            <td><strong>100% 纯离线可用</strong></td>
+                        </tr>
+                        <tr>
+                            <td>系统集成</td>
+                            <td>受限浏览器沙盒</td>
+                            <td><strong>全局快捷键 & 文件关联</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="social-links">
+                <a href="#"><i class="fa-brands fa-github"></i></a>
+                <a href="#"><i class="fa-brands fa-twitter"></i></a>
+                <a href="#"><i class="fa-brands fa-discord"></i></a>
+            </div>
+            <p>&copy; 2026 Duodushu Team. Open Source & Educational.</p>
+        </div>
+    </footer>
+
+</body>
+
+</html>

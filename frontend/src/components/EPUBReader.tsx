@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useReaderGestures } from '../hooks/useReaderGestures';
 import { saveEpubState, getEpubState } from '../lib/epubCache';
 import { createLogger } from '../lib/logger';
 
@@ -249,23 +250,67 @@ export default function EPUBReader({
         isJumpingRef.current = true; // 标记开始跳转
         
         // 1. Jump to destination (Chapter)
-        renditionRef.current.display(jump.dest).then(async () => {
-            setIsReadyToSave(true);
-            // 2. If text provided, search and refine jump
-            if (jump.text) {
-                // 等待布局稳定 (600ms)
-                setTimeout(() => {
-                    handleTextSearch(jump.text!, jump.word);
-                    // 延迟重置跳转标志，防止 resize 破坏
-                    setTimeout(() => isJumpingRef.current = false, 1000);
-                }, 600);
-            } else {
+        const tryJump = async (target: string | number, retry: boolean = true) => {
+            try {
+                await renditionRef.current!.display(target as string);
+                setIsReadyToSave(true);
+                // 2. If text provided, search and refine jump
+                if (jump.text) {
+                    setTimeout(() => {
+                        handleTextSearch(jump.text!, jump.word);
+                        setTimeout(() => isJumpingRef.current = false, 1000);
+                    }, 600);
+                } else {
+                    isJumpingRef.current = false;
+                }
+            } catch (err: any) {
+                if (retry && typeof target === 'string') {
+                     // 1. Try decoding
+                     const decoded = decodeURIComponent(target);
+                     if (decoded !== target) {
+                         log.warn(`Jump to ${target} failed, retrying with decoded ${decoded}`);
+                         return tryJump(decoded, false);
+                     }
+                     
+                     // 2. Try finding by spine item (fuzzy match)
+                     if (bookRef.current) {
+                        try {
+                            const book = bookRef.current;
+                            // Clean target (remove hash)
+                            const targetPath = target.split('#')[0];
+                            const targetHash = target.includes('#') ? target.split('#')[1] : '';
+                            
+                            // Iterate spine to find match
+                            let foundHref = '';
+                            // @ts-ignore - spine is iterable/has each
+                            book.spine.each((item: any) => {
+                                if (!foundHref) {
+                                    // Check if item.href ends with targetPath or vice versa
+                                    // This handles ../Text/Chapter.xhtml vs Chapter.xhtml
+                                    if (item.href.endsWith(targetPath) || targetPath.endsWith(item.href)) {
+                                        foundHref = item.href;
+                                    }
+                                }
+                            });
+                            
+                            if (foundHref) {
+                                const newTarget = targetHash ? `${foundHref}#${targetHash}` : foundHref;
+                                if (newTarget !== target) {
+                                    log.info(`Resolved "${target}" to spine item "${newTarget}", retrying jump...`);
+                                    return tryJump(newTarget, false);
+                                }
+                            }
+                        } catch (e) {
+                            log.warn('Spine lookup failed:', e);
+                        }
+                     }
+                }
+                log.error("Jump failed:", err);
                 isJumpingRef.current = false;
             }
-        }).catch((err: any) => {
-            log.error("Jump failed:", err);
-            isJumpingRef.current = false;
-        });
+        };
+
+        tryJump(jump.dest);
       }
     }
   }, [jumpRequest, renditionReady, handleTextSearch]);
@@ -277,24 +322,67 @@ export default function EPUBReader({
       log.debug('Processing pending jump to:', { dest: jump.dest, text: jump.text, word: jump.word });
       isJumpingRef.current = true;
       
+      
       // 1. Jump to destination
-      renditionRef.current.display(jump.dest).then(async () => {
-          setIsReadyToSave(true);
-          pendingJumpRef.current = null;
-          // 2. If text provided, search and refine jump
-          if (jump.text) {
-              setTimeout(() => {
-                  handleTextSearch(jump.text!, jump.word);
-                  setTimeout(() => isJumpingRef.current = false, 1000);
-              }, 500);
-          } else {
-              isJumpingRef.current = false;
-          }
-      }).catch((err: any) => {
-          log.error("Pending jump failed:", err);
-          isJumpingRef.current = false;
-          pendingJumpRef.current = null;
-      });
+      const tryJump = async (target: string | number, retry: boolean = true) => {
+        try {
+            await renditionRef.current!.display(target as string);
+            setIsReadyToSave(true);
+            pendingJumpRef.current = null;
+            // 2. If text provided, search and refine jump
+            if (jump.text) {
+                setTimeout(() => {
+                    handleTextSearch(jump.text!, jump.word);
+                    setTimeout(() => isJumpingRef.current = false, 1000);
+                }, 500);
+            } else {
+                isJumpingRef.current = false;
+            }
+        } catch (err: any) {
+             if (retry && typeof target === 'string') {
+                 // 1. Try decoding
+                 const decoded = decodeURIComponent(target);
+                 if (decoded !== target) {
+                     log.warn(`Pending jump to ${target} failed, retrying with decoded ${decoded}`);
+                     return tryJump(decoded, false);
+                 }
+                 
+                 // 2. Try finding by spine item (fuzzy match)
+                 if (bookRef.current) {
+                    try {
+                        const book = bookRef.current;
+                        const targetPath = target.split('#')[0];
+                        const targetHash = target.includes('#') ? target.split('#')[1] : '';
+                        
+                        let foundHref = '';
+                        // @ts-ignore
+                        book.spine.each((item: any) => {
+                            if (!foundHref) {
+                                if (item.href.endsWith(targetPath) || targetPath.endsWith(item.href)) {
+                                    foundHref = item.href;
+                                }
+                            }
+                        });
+                        
+                        if (foundHref) {
+                            const newTarget = targetHash ? `${foundHref}#${targetHash}` : foundHref;
+                            if (newTarget !== target) {
+                                log.info(`Resolved pending "${target}" to spine item "${newTarget}", retrying jump...`);
+                                return tryJump(newTarget, false);
+                            }
+                        }
+                    } catch (e) {
+                        log.warn('Spine lookup failed:', e);
+                    }
+                 }
+            }
+            log.error("Pending jump failed:", err);
+            isJumpingRef.current = false;
+            pendingJumpRef.current = null;
+        }
+      };
+
+      tryJump(jump.dest);
     }
   }, [renditionReady, handleTextSearch]);
 
@@ -945,6 +1033,7 @@ export default function EPUBReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isClient, fileUrl]); 
 
+
   const flattenToc = (toc: any[], level: number): OutlineItem[] => {
     const result: OutlineItem[] = [];
     for (const item of toc) {
@@ -1065,6 +1154,9 @@ export default function EPUBReader({
     };
   }, [renditionReady]);
 
+  // 绑定手势翻页
+  const gestureBind = useReaderGestures(goPrev, goNext, !loading);
+
   if (!isClient) return <div className="flex items-center justify-center h-full bg-gray-50"><p>初始化...</p></div>;
 
   if (error) {
@@ -1079,14 +1171,14 @@ export default function EPUBReader({
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-100" data-reader-type="epub">
+    <div className="flex flex-col h-full bg-gray-100" data-reader-type="epub" {...gestureBind()}>
       <div className="flex-1 relative overflow-hidden">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
             <div className="text-center"><p className="text-gray-500">加载 EPUB...</p></div>
           </div>
         )}
-        <div ref={containerRef} className={`h-full bg-white mx-auto shadow-sm transition-all duration-300 ${fitMode === 'page' ? 'max-w-5xl w-full' : 'w-full px-4'}`} />
+        <div ref={containerRef} className={`h-full bg-white mx-auto shadow-sm transition-all duration-300 ${fitMode === 'page' ? 'max-w-5xl w-full' : 'w-full px-2 sm:px-4'}`} />
         
 
       </div>

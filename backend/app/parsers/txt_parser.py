@@ -24,7 +24,9 @@ class TXTParser(BaseParser):
             raise Exception("无法读取 TXT 文件（编码问题）")
 
         # 提取元数据
-        title = Path(file_path).stem  # 文件名作为标题
+        # TXT 文件本身包含标题元数据，也不应该使用存储的文件名（UUID）作为标题
+        # 让 service 层保留上传时的原始文件名
+        title = None
         author = "Unknown"
 
         # 按固定字符数分页，尽量在换行处分割

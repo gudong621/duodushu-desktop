@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useReaderGestures } from "../hooks/useReaderGestures";
 import { Document, Page as PDFPage, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -764,7 +765,7 @@ interface ReaderProps {
     );
     return (
       <div className="flex-1 overflow-auto bg-gray-50 flex justify-center">
-        <div className="max-w-3xl w-full bg-white shadow-sm min-h-full p-6 md:p-12">
+        <div className="max-w-3xl w-full bg-white shadow-sm min-h-full p-4 sm:p-6 md:p-12">
           <div className="prose prose-xl max-w-none font-serif leading-loose text-gray-800">
             {tokens.map((token, i) => {
               const isWord = /^[a-zA-Z0-9À-ÿ]+(?:['’-][a-zA-Z0-9À-ÿ]+)*$/.test(
@@ -840,6 +841,22 @@ interface ReaderProps {
       }
   };
 
+  // 手势翻页处理
+  const handlePrevPage = useCallback(() => {
+    if (pageNumber > 1) {
+      goToPage(pageNumber - 1);
+    }
+  }, [pageNumber, goToPage]);
+
+  const handleNextPage = useCallback(() => {
+    if (pageNumber < (numPages || totalPages || 1)) {
+      goToPage(pageNumber + 1);
+    }
+  }, [pageNumber, numPages, totalPages, goToPage]);
+
+  // 绑定手势
+  const gestureBind = useReaderGestures(handlePrevPage, handleNextPage, viewMode === "pdf");
+
   return (
     <div 
       className={`flex flex-col h-full bg-gray-100 ${isSelecting ? "pdf-reading-mode--selecting" : ""}`} 
@@ -847,6 +864,7 @@ interface ReaderProps {
       data-reader-type="pdf"
       onMouseDown={handleContainerMouseDown}
       onMouseMove={handleContainerMouseMove}
+      {...gestureBind()}
     >
       {viewMode === "pdf" ? (
         <div className="flex-1 overflow-hidden flex" ref={scrollContainerRef}>

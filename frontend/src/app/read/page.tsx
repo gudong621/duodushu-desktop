@@ -12,6 +12,8 @@ import { useGlobalTextSelection } from "../../hooks/useGlobalTextSelection";
 import Link from "next/link";
 import { trackWordQuery } from "../../lib/api";
 import { createLogger } from "../../lib/logger";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts";
+import { createReaderShortcuts, SHORTCUT_TITLES } from "../../lib/shortcuts";
 
 const log = createLogger('ReaderPage');
 
@@ -245,6 +247,47 @@ function ReaderContent() {
   // --- AI / Dictionary Toggle ---
   const [sidebarMode, setSidebarMode] = useState<"dictionary" | "ai" | "notes">
     ("dictionary");
+
+  // --- 键盘快捷键 ---
+  const toggleSidebarMode = useCallback((mode: "dictionary" | "ai" | "notes") => {
+    if (sidebarMode === mode && !rightSidebarCollapsed) {
+      setRightSidebarCollapsed(true);
+    } else {
+      setSidebarMode(mode);
+      setRightSidebarCollapsed(false);
+    }
+  }, [sidebarMode, rightSidebarCollapsed]);
+
+  const handlePrevPage = useCallback(() => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  }, [currentPage, handlePageChange]);
+
+  const handleNextPage = useCallback(() => {
+    if (totalPages && currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
+  }, [currentPage, totalPages, handlePageChange]);
+
+  const closeSidebar = useCallback(() => {
+    setRightSidebarCollapsed(true);
+  }, []);
+
+  // 绑定键盘快捷键
+  const readerShortcuts = useMemo(() => 
+    createReaderShortcuts(
+      handlePrevPage,
+      handleNextPage,
+      () => toggleSidebarMode("dictionary"),
+      () => toggleSidebarMode("ai"),
+      () => toggleSidebarMode("notes"),
+      closeSidebar
+    ),
+    [handlePrevPage, handleNextPage, toggleSidebarMode, closeSidebar]
+  );
+
+  useKeyboardShortcuts(readerShortcuts, !!book);
 
   // --- Notes State ---
   const [notes, setNotes] = useState<Note[]>([]);
@@ -920,11 +963,14 @@ function ReaderContent() {
               <div className="flex gap-1 flex-1">
                 <button
                   onClick={() => setSidebarMode("dictionary")}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${ 
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 touch-target ${ 
                     sidebarMode === "dictionary"
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
+                  title={SHORTCUT_TITLES.dictionary}
+                  aria-label="词典侧边栏"
+                  aria-pressed={sidebarMode === "dictionary"}
                 >
                   <svg
                     className="w-4 h-4"
@@ -943,11 +989,14 @@ function ReaderContent() {
                 </button>
                 <button
                   onClick={() => setSidebarMode("ai")}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${ 
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 touch-target ${ 
                     sidebarMode === "ai"
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
+                  title={SHORTCUT_TITLES.ai}
+                  aria-label="AI 老师侧边栏"
+                  aria-pressed={sidebarMode === "ai"}
                 >
                   <svg
                     className="w-4 h-4"
@@ -966,11 +1015,14 @@ function ReaderContent() {
                 </button>
                 <button
                   onClick={() => setSidebarMode("notes")}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${ 
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 touch-target ${ 
                     sidebarMode === "notes"
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
+                  title={SHORTCUT_TITLES.notes}
+                  aria-label="笔记侧边栏"
+                  aria-pressed={sidebarMode === "notes"}
                 >
                   <svg
                     className="w-4 h-4"

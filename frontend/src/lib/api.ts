@@ -1,29 +1,29 @@
 // 尝试从 Electron 获取后端 URL（便携版使用）
 // 在开发环境或 Electron 未提供 URL 时，使用默认值
-let API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+let API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // 如果在 Electron 环境中（检测 window.electronAPI）
+// 注意：避免在模块顶层使用 await 以免阻塞 Next.js 渲染
 if (typeof window !== 'undefined' && (window as any).electronAPI) {
-  try {
-    const backendUrl = await (window as any).electronAPI.getBackendUrl();
+  (window as any).electronAPI.getBackendUrl().then((backendUrl: string) => {
     if (backendUrl) {
       API_URL = backendUrl;
       console.log('[API] Using backend URL from Electron:', backendUrl);
     }
-  } catch (e) {
+  }).catch((e: any) => {
     console.warn('[API] Failed to get backend URL from Electron:', e);
-  }
+  });
 }
 
-// 如果在 Electron 环境中但没有提供 URL，使用 localhost
-if (typeof window !== 'undefined' && !(window as any).electronAPI) {
-  // 默认：检测是否是 Electron 环境（通过 electronAPI 是否存在判断）
-  // 如果是 Electron，说明主进程应该提供后端 URL
-  // 但如果 electronAPI 不存在，可能是开发模式的 Electron
-  API_URL = "http://127.0.0.1:8000";
+// 注意：不建议在没有 electronAPI 的情况下强制覆盖 API_URL，
+// 除非确定在非开发环境下需要这样做。
+// 这里保留 localhost 作为最后的退路
+if (typeof window !== 'undefined' && API_URL === "http://localhost:8000" && !(window as any).electronAPI) {
+  // 可能是网页直播预览模式，保持默认 localhost
+  console.log('[API] Using default localhost URL');
 }
 
-console.log('[API] Final API URL:', API_URL);
+console.log('[API] Initial API URL configured:', API_URL);
 
 // 带超时的 fetch 函数
 async function fetchWithTimeout(url: string, timeout: number, options?: RequestInit): Promise<Response> {
@@ -83,7 +83,8 @@ export async function deleteBook(id: string): Promise<void> {
 }
 
 export async function getBooks(): Promise<Book[]> {
-  const res = await fetch(`${API_URL}/api/books/`);
+  const url = `${API_URL}/api/books/?_t=${Date.now()}`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch books");
   return res.json();
 }

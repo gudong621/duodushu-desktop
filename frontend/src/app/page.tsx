@@ -26,24 +26,20 @@ export default function Home() {
       setError(null);
     }
 
-    const maxRetries = isPolling ? 1 : 5;
+    const maxRetries = isPolling ? 1 : 3;
     let attempt = 0;
-    let loaded = false;
+    let success = false;
 
-    while (attempt < maxRetries && !loaded) {
+    while (attempt < maxRetries && !success) {
       try {
         const data = await getBooks();
         setBooks(data);
-        if (isPolling && pollingError) {
-          setPollingError(null); // Clear error if fetch succeeds during polling
-        }
-        if (!isPolling) {
-          setIsLoading(false);
-        }
-        loaded = true;
+        setPollingError(null);
+        if (!isPolling) setIsLoading(false);
+        success = true;
       } catch (err) {
         attempt++;
-        console.error(`Failed to load books (attempt ${attempt}/${maxRetries}):`, err);
+        console.error(`[Bookshelf] Load failed (attempt ${attempt}/${maxRetries}):`, err);
         
         if (attempt >= maxRetries) {
           if (isPolling) {
@@ -53,12 +49,11 @@ export default function Home() {
             setIsLoading(false);
           }
         } else {
-          // Wait before retry (exponential backoff: 500, 1000, 2000, 4000ms)
-          await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+          await new Promise(r => setTimeout(r, 1000 * attempt));
         }
       }
     }
-  }, [pollingError]);
+  }, []);
 
   const handleDelete = (e: React.MouseEvent, bookId: string) => {
     e.preventDefault();
@@ -137,23 +132,24 @@ export default function Home() {
   }, [books, fetchBooks]);
 
   return (
-    <main className="min-h-screen bg-white py-8 px-4 sm:px-6 lg:px-8">
+    <main role="main" className="min-h-screen bg-white py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <header className="flex justify-between items-center">
+        <header role="banner" className="flex justify-between items-center">
           <div>
             <div className="flex items-center gap-3">
-              <svg className="w-8 h-8 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              <svg className="w-8 h-8 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332-.477-4.5 1.253" />
               </svg>
               <h1 className="text-3xl font-bold text-gray-900">多读书</h1>
             </div>
             <p className="mt-2 text-gray-500">上传书籍，开始沉浸式阅读</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => setUploadDialogOpen(true)}
-              className="w-10 h-10 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors group hover:bg-gray-100 rounded-full border-none p-0 outline-none shrink-0"
+              className="w-11 h-11 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors group hover:bg-gray-100 rounded-full border-none outline-none shrink-0 touch-icon-btn"
               title="上传书籍"
+              aria-label="上传书籍"
             >
               <svg className="w-6 h-6 transition-transform group-hover:-translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
@@ -161,8 +157,9 @@ export default function Home() {
             </button>
             <Link
               href="/dicts"
-              className="w-10 h-10 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0"
+              className="w-11 h-11 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0 touch-icon-btn"
               title="词典管理"
+              aria-label="词典管理"
             >
               <svg className="w-6 h-6 outline-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.5 4h11a1 1 0 011 1v14a1 1 0 01-1 1h-11a2 2 0 01-2-2V6a2 2 0 012-2z" />
@@ -172,8 +169,9 @@ export default function Home() {
             </Link>
             <Link
               href="/vocabulary"
-              className="w-10 h-10 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0"
+              className="w-11 h-11 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0 touch-icon-btn"
               title="生词本"
+              aria-label="生词本"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -181,8 +179,9 @@ export default function Home() {
             </Link>
             <button
               onClick={() => setSettingsDialogOpen(true)}
-              className="w-10 h-10 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0"
+              className="w-11 h-11 inline-grid place-items-center text-gray-500 hover:text-gray-900 transition-colors hover:bg-gray-100 rounded-full shrink-0 touch-icon-btn"
               title="API 配置"
+              aria-label="设置"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
@@ -194,7 +193,7 @@ export default function Home() {
 
         <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">我的书架</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6">
             {isLoading ? (
               <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
                 <svg className="w-10 h-10 animate-spin mb-4 text-blue-600" fill="none" viewBox="0 0 24 24">
@@ -242,11 +241,12 @@ export default function Home() {
                             </div>
                         )}
     
-                        {/* 右上角删除按钮（hover显示） */}
+                        {/* 右上角删除按钮（移动端始终显示，桌面端hover显示） */}
                         <button
                           onClick={(e) => handleDelete(e, book.id)}
-                          className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900 hover:border-gray-400 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900 hover:border-gray-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity z-10 touch-icon-btn"
                           title="删除书籍"
+                          aria-label={`删除书籍: ${book.title}`}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -293,13 +293,13 @@ export default function Home() {
                         </h3>
                         {/* 书籍信息 */}
                         <div className="mt-2 flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-500">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <span className="text-gray-500 whitespace-nowrap truncate">
                               {book.format.toUpperCase()}
                               {book.total_pages && ` · ${book.total_pages}页`}
                             </span>
                             {book.book_type === 'example_library' && hoveredBookId === book.id && (
-                              <span className="text-xs text-gray-400">
+                              <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">
                                 ♥ 例句库
                               </span>
                             )}
@@ -342,7 +342,12 @@ export default function Home() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+        >
             <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center gap-4 mb-4">
                     <div className="p-3 bg-gray-100 rounded-full">
@@ -350,7 +355,7 @@ export default function Home() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900">确认删除</h3>
+                    <h3 id="delete-confirm-title" className="text-lg font-bold text-gray-900">确认删除</h3>
                 </div>
 
                 <p className="text-gray-600 mb-6">

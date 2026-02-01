@@ -85,7 +85,19 @@ def verify_and_process_book_task(book_id: str):
         result = parser.parse(str(full_file_path), book_id)
 
         # Update book metadata
-        book.title = result.get("title", book.title)
+        # Only update title if parser found a real title, not just the filename (which is a UUID)
+        parsed_title = result.get("title")
+        file_stem = full_file_path.stem
+        
+        logger.info(f"Book {book_id} Title Check - Original: '{book.title}', Parsed: '{parsed_title}', FileStem: '{file_stem}'")
+        
+        if parsed_title:
+             # Case-insensitive check and stripping just in case
+             if parsed_title.lower().strip() != file_stem.lower().strip():
+                 book.title = parsed_title
+             else:
+                 logger.info(f"Skipping title update: Parsed title '{parsed_title}' matches file stem (likely UUID).")
+            
         book.author = result.get("author")  # type: ignore
         book.total_pages = result.get("total_pages")  # type: ignore
         book.cover_image = result.get("cover_image")  # type: ignore

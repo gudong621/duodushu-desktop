@@ -71,8 +71,8 @@ export default function TXTReader({
   return (
     <div className="flex flex-col h-full overflow-hidden bg-gray-50">
       {/* 主内容区 - 关键修复：添加 min-h-0 允许子容器正确触发滚动 */}
-      <div className="flex-1 overflow-y-auto min-h-0 flex justify-center p-4 md:p-8">
-        <div className="max-w-4xl w-full bg-white shadow-xl rounded-2xl p-8 md:p-16 h-fit my-4 border border-gray-100">
+      <div className="flex-1 overflow-y-auto min-h-0 flex justify-center p-4 sm:p-6 md:p-8">
+        <div className="max-w-4xl w-full bg-white shadow-xl rounded-xl sm:rounded-2xl p-6 sm:p-8 md:p-12 lg:p-16 h-fit my-2 sm:my-4 border border-gray-100">
           <div className="prose prose-slate prose-lg max-w-none font-serif leading-loose text-gray-800">
             {segments.map((line, lineIndex) => (
               <p key={lineIndex} className="mb-6 last:mb-0">

@@ -118,15 +118,14 @@ export default function SelectionToolbar({
         <div className="relative group">
           <button
             onClick={handleNote}
-            className="flex items-center justify-center w-8 h-8 hover:bg-gray-700 rounded-md transition-colors"
+            className="flex items-center justify-center w-10 h-10 hover:bg-gray-700 rounded-md transition-colors touch-icon-btn"
+            aria-label="记笔记"
+            title="记笔记"
           >
             <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
           </button>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            记笔记
-          </div>
         </div>
       )}
 
@@ -140,15 +139,14 @@ export default function SelectionToolbar({
         <div className="relative group">
           <button
             onClick={handleAskAI}
-            className="flex items-center justify-center w-8 h-8 hover:bg-gray-700 rounded-md transition-colors"
+            className="flex items-center justify-center w-10 h-10 hover:bg-gray-700 rounded-md transition-colors touch-icon-btn"
+            aria-label="询问 AI 老师"
+            title="询问 AI"
           >
             <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </button>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            问老师
-          </div>
         </div>
       )}
 
@@ -162,15 +160,14 @@ export default function SelectionToolbar({
         <div className="relative group">
           <button
             onClick={handleLookup}
-            className="flex items-center justify-center w-8 h-8 hover:bg-gray-700 rounded-md transition-colors"
+            className="flex items-center justify-center w-10 h-10 hover:bg-gray-700 rounded-md transition-colors touch-icon-btn"
+            aria-label="查词典"
+            title="查词典"
           >
             <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18c1.747 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332-.477-4.5-1.253M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13" />
             </svg>
           </button>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            查词典
-          </div>
         </div>
       )}
 
@@ -184,15 +181,14 @@ export default function SelectionToolbar({
         <div className="relative group">
           <button
             onClick={handleCopy}
-            className="flex items-center justify-center w-8 h-8 hover:bg-gray-700 rounded-md transition-colors"
+            className="flex items-center justify-center w-10 h-10 hover:bg-gray-700 rounded-md transition-colors touch-icon-btn"
+            aria-label="复制到剪贴板"
+            title="复制"
           >
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </button>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-white rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            复制
-          </div>
         </div>
       )}
 

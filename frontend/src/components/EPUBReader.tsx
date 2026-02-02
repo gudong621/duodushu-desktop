@@ -123,11 +123,16 @@ export default function EPUBReader({
 
   // 辅助函数：处理文本搜索和高亮
   const handleTextSearch = useCallback(async (text: string, word?: string, maxAttempts = 15, pageOffset = 0, retryLevel = 0) => {
+      log.info('handleTextSearch called:', { text: text.substring(0, 30), word, maxAttempts, pageOffset, retryLevel });
       try {
-          if (!renditionRef.current || !bookRef.current) return false;
+          if (!renditionRef.current || !bookRef.current) {
+              log.warn('handleTextSearch: rendition or book not ready');
+              return false;
+          }
 
           const contents = renditionRef.current.getContents()[0];
           if (!contents || !contents.window) {
+              log.warn('handleTextSearch: contents not available, retrying...');
               if (maxAttempts > 0) {
                   setTimeout(() => handleTextSearch(text, word, maxAttempts - 1, pageOffset, retryLevel), 200);
               }
@@ -363,13 +368,19 @@ export default function EPUBReader({
             
             setIsReadyToSave(true);
             jumpRequestedBeforeReadyRef.current = null;
-            
+
             if (savedJump.text) {
+              log.info('Scheduling text search after jump:', { text: savedJump.text, word: savedJump.word });
               setTimeout(() => {
+                log.info('Starting text search now');
                 handleTextSearch(savedJump.text!, savedJump.word);
-                setTimeout(() => isJumpingRef.current = false, 1000);
+                setTimeout(() => {
+                  log.info('Text search completed, clearing jumping flag');
+                  isJumpingRef.current = false;
+                }, 1000);
               }, 600);
             } else {
+              log.info('No text to search, clearing jumping flag');
               isJumpingRef.current = false;
             }
           } catch (err) {

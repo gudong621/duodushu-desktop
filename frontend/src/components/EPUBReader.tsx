@@ -310,7 +310,11 @@ export default function EPUBReader({
           // 如果是严格模式失败，先尝试降级，不翻页
           if (retryLevel < 3) {
               log.debug(`Level ${retryLevel} failed, retrying with Level ${retryLevel + 1}...`);
-              return handleTextSearch(text, word, maxAttempts, pageOffset, retryLevel + 1);
+              // 关键修复：使用 setTimeout 异步重试，避免同步递归导致所有级别立即执行
+              setTimeout(() => {
+                  handleTextSearch(text, word, maxAttempts, pageOffset, retryLevel + 1);
+              }, 50);
+              return false;
           }
 
           // --- 翻页搜索（用遮罩隐藏翻页过程）---

@@ -130,17 +130,27 @@ export default function EPUBReader({
               return false;
           }
 
-          const contents = renditionRef.current.getContents()[0];
-          if (!contents || !contents.window) {
-              log.warn('handleTextSearch: contents not available, retrying...');
+          const contents = renditionRef.current.getContents();
+          log.debug('getContents() returned:', {
+              contentsLength: contents?.length,
+              hasWindow: contents?.[0]?.window ? 'yes' : 'no',
+              hasDocument: contents?.[0]?.document ? 'yes' : 'no'
+          });
+
+          if (!contents || !contents[0] || !contents[0].window) {
+              log.warn('handleTextSearch: contents not available, retrying...', {
+                  contentsExists: !!contents,
+                  firstItemExists: !!contents?.[0],
+                  windowExists: !!contents?.[0]?.window
+              });
               if (maxAttempts > 0) {
                   setTimeout(() => handleTextSearch(text, word, maxAttempts - 1, pageOffset, retryLevel), 200);
               }
               return false;
           }
 
-          const win = contents.window;
-          const doc = contents.document;
+          const win = contents[0].window;
+          const doc = contents[0].document;
 
           // --- 策略：多级降级搜索 ---
           let query = text.trim();

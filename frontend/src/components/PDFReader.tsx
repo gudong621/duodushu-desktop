@@ -97,7 +97,7 @@ interface ReaderProps {
   onPageChange?: (page: number) => void;
   onTotalPagesChange?: (pages: number) => void;
   onOutlineChange?: (outline: OutlineItem[]) => void;
-  jumpRequest?: { dest: any; ts: number } | null;
+  jumpRequest?: { dest: any; text?: string; word?: string; ts: number } | null;
   onAskAI?: (text: string) => void;
   onHighlight?: (text: string, pageNumber: number) => void;
   onContentChange?: (content: string) => void; // 新增回调
@@ -173,6 +173,15 @@ interface ReaderProps {
     y: 0,
   });
 
+  // Reset dimensions when page changes to prevent stale data usage
+  // 注意：滚动位置重置移至 handlePageLoad，确保 PDF 页面完全渲染后再重置
+  useEffect(() => {
+    setPageDimensions(null);
+    setPageOffset({ x: 0, y: 0 });
+    // 不要在这里重置 scrollTop，因为此时新页面尚未加载完成
+    // 滚动重置将在 handlePageLoad 中执行
+  }, [pageNumber]);
+
   // Manual Calibration State
   const [manualOffset, setManualOffset] = useState<{ x: number; y: number }>(
     () => {
@@ -232,9 +241,22 @@ interface ReaderProps {
     onPageChange?.(validPage);
   }, [numPages, totalPages, onPageChange]);
 
-  // Handle jump requests (e.g. from TOC when page number resolution failed)
+  // Pending highlight state for scrolling
+  const [pendingHighlight, setPendingHighlight] = useState<{
+    text?: string;
+    word?: string;
+  } | null>(null);
+  const [shouldScrollToHighlight, setShouldScrollToHighlight] = useState(false);
+
+  // Handle jump requests (e.g. from TOC or View Original)
   useEffect(() => {
-    if (!jumpRequest || !pdfDocRef.current) return;
+    if (!jumpRequest) return;
+
+    if (jumpRequest.text || jumpRequest.word) {
+      setPendingHighlight({ text: jumpRequest.text, word: jumpRequest.word });
+    }
+
+    if (!pdfDocRef.current) return;
 
     const jumpToDest = async () => {
       try {
@@ -251,9 +273,7 @@ interface ReaderProps {
             goToPage(pageIndex + 1);
           }
         } else if (typeof dest === "number") {
-          goToPage(dest + 1); // getPageIndex returns 0-based index? wait, dest is usually not number for page index, it's ref.
-          // If passed raw page number from somewhere else? Usually TOC items have calculated pageNumber.
-          // But let's support pageIndex just in case.
+          goToPage(dest + 1);
         }
       } catch (e) {
         console.warn("Failed to jump to destination:", e);
@@ -262,6 +282,8 @@ interface ReaderProps {
 
     jumpToDest();
   }, [jumpRequest, goToPage]);
+
+
 
   const getActualWidth = useCallback(() => {
     if (!pageDimensions) return 600;
@@ -407,6 +429,141 @@ interface ReaderProps {
       document.removeEventListener("selectionchange", handleSelectionChange);
   }, [processedWords, pageDimensions, renderWidth, pageOffset, manualOffset.x, manualOffset.y]);
 
+  // Effect to perform scroll when words are loaded and we have a pending highlight
+  useEffect(() => {
+    if (
+      !pendingHighlight ||
+      !processedWords ||
+      processedWords.length === 0 ||
+      !pageDimensions ||
+      !contentRef.current // Fixed: was scrollContainerRef, should be contentRef
+    )
+      return;
+
+    const targetWord = pendingHighlight.word?.toLowerCase() || "";
+    // Clean target context: remove punctuation for fuzzy matching
+    const targetContext = pendingHighlight.text
+      ? pendingHighlight.text.toLowerCase().replace(/[^\w\s]/g, "")
+      : "";
+
+    if (!targetWord && !targetContext) return;
+
+    let bestMatch: WordData | null = null;
+    let bestScore = -1;
+
+    // Candidate matches: all words that match the targetWord (or partial match)
+    const candidates = processedWords
+      .map((w, i) => ({ w, i }))
+      .filter(
+        ({ w }) =>
+          targetWord &&
+          (w.text.toLowerCase() === targetWord ||
+            w.text.toLowerCase().includes(targetWord)),
+      );
+
+    if (candidates.length > 0) {
+      if (targetContext && candidates.length > 1) {
+        // Disambiguate using context
+        for (const { w, i } of candidates) {
+          // Extract a window of words around the candidate
+          const windowSize = 20;
+          const start = Math.max(0, i - windowSize);
+          const end = Math.min(processedWords.length, i + windowSize);
+          const contextWindow = processedWords
+            .slice(start, end)
+            .map((pw) => pw.text.toLowerCase().replace(/[^\w\s]/g, ""))
+            .join(" ");
+
+          // Simple scoring: check if targetContext is roughly in contextWindow
+          // We can check overlap tokens
+          const contextTokens = targetContext.split(/\s+/);
+          const windowTokens = contextWindow.split(/\s+/);
+          
+          let overlap = 0;
+          for (const token of contextTokens) {
+             if (windowTokens.includes(token)) overlap++;
+          }
+           
+          // Normalize score by length
+          const score = overlap / (contextTokens.length || 1);
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = w;
+          }
+        }
+      } else {
+        // Only one match or no context, pick the first/only one
+        bestMatch = candidates[0].w;
+      }
+    } else if (targetContext) {
+       // If no word match (maybe word segmentation diff), try to match context globally?
+       // Harder with ProcessedWords. Fallback: don't scroll.
+    }
+
+    if (bestMatch) {
+      const totalOffsetX = pageOffset.x + manualOffset.x;
+      const totalOffsetY = pageOffset.y + manualOffset.y;
+      const scaleFactor = renderWidth / pageDimensions.width;
+
+      // Highlight the word visually
+      setHoveredWord({
+        data: bestMatch,
+        rect: {
+            left: (bestMatch.x - totalOffsetX) * scaleFactor,
+            top: (bestMatch.y - totalOffsetY) * scaleFactor,
+            width: bestMatch.width * scaleFactor,
+            height: bestMatch.height * scaleFactor,
+        },
+      });
+      
+      // Trigger scroll on next render
+      setShouldScrollToHighlight(true);
+      setPendingHighlight(null);
+    }
+  }, [
+    pendingHighlight,
+    processedWords,
+    pageDimensions,
+    renderWidth,
+    pageOffset,
+    manualOffset,
+  ]);
+
+  // Execute scroll when highlight is ready
+  useEffect(() => {
+    if (shouldScrollToHighlight && hoveredWord) {
+        // Use setTimeout to ensure the page is fully rendered and painted
+        // requestAnimationFrame alone is not sufficient for complex PDF renders
+        const timeoutId = setTimeout(() => {
+            const container = contentRef.current;
+            const el = document.getElementById("pdf-curr-highlight");
+            
+            if (el && container) {
+                // Manual calculation to strictly control vertical scroll only
+                // This avoids any horizontal shifting that might occur with scrollIntoView
+                const containerRect = container.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                
+                const relativeTop = elRect.top - containerRect.top;
+                const currentScrollTop = container.scrollTop;
+                
+                // Target: Center the element in the container
+                // New ScrollTop = Current ScrollTop + Relative Top - (Container Height / 2) + (Element Height / 2)
+                const targetScrollTop = currentScrollTop + relativeTop - (containerRect.height / 2) + (elRect.height / 2);
+                
+                container.scrollTo({
+                    top: Math.max(0, targetScrollTop),
+                    behavior: "smooth"
+                });
+            }
+            setShouldScrollToHighlight(false);
+        }, 150); // 150ms delay to ensure PDF page is fully painted
+        
+        return () => clearTimeout(timeoutId);
+    }
+  }, [shouldScrollToHighlight, hoveredWord]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -473,6 +630,16 @@ interface ReaderProps {
     // This should handle negative cropbox coordinates correctly.
     setPageOffset({ x: viewport.offsetX, y: viewport.offsetY });
     setPageDimensions({ width, height });
+
+    // 关键修复：只有在没有待处理的高亮时才重置滚动位置
+    // 如果有 pendingHighlight，让其处理滚动，避免竞态条件导致页面停在两页中间
+    if (!pendingHighlight) {
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = 0;
+        }
+      }, 0);
+    }
 
     // 修复：当 PDF 页面加载完成时，提取文本内容并同步给 AI
     // 优先使用实时提取的文本，如果失败则使用后端返回的textContent
@@ -864,6 +1031,7 @@ interface ReaderProps {
 
                   {hoveredWord && (
                     <div
+                      id="pdf-curr-highlight"
                       className="absolute bg-yellow-200/50 rounded-sm transition-opacity"
                       style={
                         {

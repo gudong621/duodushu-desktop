@@ -58,10 +58,12 @@ export default function EPUBReader({
   const [isReadyToSave, setIsReadyToSave] = useState(false);
   const [renditionReady, setRenditionReady] = useState(false);
   const pendingJumpRef = useRef<{ dest: string | number; text?: string; word?: string; ts: number } | null>(null);
-  const lastHighlightRef = useRef<{ text: string; word?: string; ts: number } | null>(null); // 新增：保存最近高亮信息
-  const isJumpingRef = useRef<boolean>(false); // 标记是否正在跳转（用于防止 resize 破坏高亮）
+  const lastHighlightRef = useRef<{ text: string; word?: string; ts: number } | null>(null);
+  const isJumpingRef = useRef<boolean>(false);
   const contentSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const appearanceMenuRef = useRef<HTMLDivElement>(null);
+  const lastProcessedJumpTs = useRef<number>(0);
+  const jumpRequestedBeforeReadyRef = useRef<{ dest: string | number; text?: string; word?: string; ts: number } | null>(null);
   
   // Ref to hold latest settings for hooks to avoid stale closures
   const settingsRef = useRef({
@@ -137,12 +139,12 @@ export default function EPUBReader({
 
           // --- 策略：多级降级搜索 ---
           let query = text.trim();
-          
+
           if (word) {
               const cleanText = text.trim();
               const cleanWord = word.trim();
               const index = cleanText.toLowerCase().indexOf(cleanWord.toLowerCase());
-              
+
               if (retryLevel === 0) {
                    // Level 0: 严格模式 - 上下文 + 单词 + 上下文 (最准确)
                    if (index !== -1) {
@@ -156,7 +158,7 @@ export default function EPUBReader({
                    // Level 1: 宽松模式 - 仅单词 + 后文 (解决前文跨行/截断问题)
                    if (index !== -1) {
                         const end = Math.min(cleanText.length, index + cleanWord.length + 10);
-                        query = cleanText.substring(index, end).trim(); 
+                        query = cleanText.substring(index, end).trim();
                    } else {
                         query = cleanWord;
                    }
@@ -192,7 +194,7 @@ export default function EPUBReader({
                           // 在找到的范围内二次搜索单词
                           const foundText = range.toString();
                           const wordIndex = foundText.toLowerCase().indexOf(word.toLowerCase());
-                          
+
                           if (wordIndex !== -1) {
                               // 计算单词在 range 内的精确位置
                               const startNode = range.startContainer;
@@ -204,10 +206,10 @@ export default function EPUBReader({
                                       const wordStart = baseOffset + wordIndex;
                                       const wordEnd = wordStart + word.length;
                                       const maxLen = textContent.length;
-                                      
+
                                       safeSetRangeStart(wordRange, startNode, Math.min(wordStart, maxLen));
                                       safeSetRangeEnd(wordRange, startNode, Math.min(wordEnd, maxLen));
-                                      
+
                                       const wordRect = wordRange.getBoundingClientRect();
                                       searchOverlay.style.width = `${wordRect.width + 4}px`;
                                       searchOverlay.style.height = `${wordRect.height + 4}px`;
@@ -237,7 +239,7 @@ export default function EPUBReader({
                               // 单词不在范围内，不显示高亮
                               searchOverlay.style.display = 'none';
                           }
-                          
+
                           // 3秒后自动隐藏
                           setTimeout(() => {
                               searchOverlay.style.display = 'none';
@@ -251,7 +253,7 @@ export default function EPUBReader({
                   }
 
                   lastHighlightRef.current = { text, word, ts: Date.now() };
-                  
+
                   // 搜索成功，隐藏遮罩
                   setIsSearching(false);
               }
@@ -259,15 +261,17 @@ export default function EPUBReader({
           }
 
           // --- 搜索失败处理逻辑 ---
-          
+
           // 如果是严格模式失败，先尝试降级，不翻页
           if (retryLevel < 2) {
               log.debug(`Level ${retryLevel} failed, retrying with Level ${retryLevel + 1}...`);
               return handleTextSearch(text, word, maxAttempts, pageOffset, retryLevel + 1);
           }
-          
+
           // --- 翻页搜索（用遮罩隐藏翻页过程）---
-          if (maxAttempts > 0) {
+          // 关键修复：限制翻页次数，避免跨页过多导致页面位置不准确
+          // 最多翻页 3 次（当前页 + 前后各 3 页），超过则放弃
+          if (maxAttempts > 0 && pageOffset < 3) {
               log.debug('Text not found on current view, turning to next view...');
               // 显示搜索遮罩，隐藏翻页过程
               if (pageOffset === 0) {
@@ -293,24 +297,126 @@ export default function EPUBReader({
     setIsClient(true);
   }, []);
 
-  const lastProcessedJumpTs = useRef<number>(0);
+  // 关键修复：当 renditionReady 变为 true 时，处理之前保存的 jumpRequest
+  useEffect(() => {
+    if (renditionReady && renditionRef.current && bookRef.current) {
+      const savedJump = jumpRequestedBeforeReadyRef.current;
+      if (savedJump && savedJump.ts !== lastProcessedJumpTs.current) {
+        log.info('Rendition ready, processing saved jump:', savedJump);
+        lastProcessedJumpTs.current = savedJump.ts;
+        pendingJumpRef.current = savedJump;
+        
+        // 直接复制 tryJump 逻辑到这里
+        const executeJump = async () => {
+          try {
+            log.info('Executing saved jump with target:', { target: savedJump.dest, type: typeof savedJump.dest });
+            
+            let displayTarget: string | number = savedJump.dest;
+            if (typeof savedJump.dest === 'number') {
+              displayTarget = savedJump.dest;
+            }
+            
+            await renditionRef.current!.display(displayTarget);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const currentLocation = renditionRef.current!.currentLocation();
+            log.debug('Saved jump - current location after first jump:', currentLocation);
+            
+            if (typeof savedJump.dest === 'string' && currentLocation && currentLocation.start) {
+              const pageStartCfi = currentLocation.start.cfi;
+              await renditionRef.current!.display(pageStartCfi);
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            setIsReadyToSave(true);
+            jumpRequestedBeforeReadyRef.current = null;
+            
+            if (savedJump.text) {
+              setTimeout(() => {
+                handleTextSearch(savedJump.text!, savedJump.word);
+                setTimeout(() => isJumpingRef.current = false, 1000);
+              }, 600);
+            } else {
+              isJumpingRef.current = false;
+            }
+          } catch (err) {
+            log.error('Saved jump execution failed:', err);
+            jumpRequestedBeforeReadyRef.current = null;
+            isJumpingRef.current = false;
+          }
+        };
+        
+        isJumpingRef.current = true;
+        executeJump();
+      }
+    }
+  }, [renditionReady, handleTextSearch]);
 
-  // Handle jump requests
+  // Handle jump requests (注意：refs 已在文件顶部定义)
   useEffect(() => {
     if (jumpRequest?.dest) {
       if (jumpRequest.ts === lastProcessedJumpTs.current) return;
       lastProcessedJumpTs.current = jumpRequest.ts;
 
+      log.info('Jump request received:', { 
+        dest: jumpRequest.dest, 
+        text: jumpRequest.text, 
+        word: jumpRequest.word,
+        renditionReady 
+      });
+
       pendingJumpRef.current = jumpRequest;
-      if (renditionReady && renditionRef.current && bookRef.current) {
+      
+      // 关键修复：如果 rendition 还没准备好，保存 jumpRequest 供后续处理
+      if (!renditionReady) {
+        log.info('Rendition not ready yet, saving jump request for later');
+        jumpRequestedBeforeReadyRef.current = jumpRequest;
+        return;
+      }
+      
+      if (renditionRef.current && bookRef.current) {
         const jump = jumpRequest;
-        log.debug('Jumping to:', { dest: jump.dest, text: jump.text, word: jump.word });
+        log.info('Jumping now to:', { dest: jump.dest, text: jump.text, word: jump.word });
         isJumpingRef.current = true; // 标记开始跳转
         
         // 1. Jump to destination (Chapter)
         const tryJump = async (target: string | number, retry: boolean = true) => {
             try {
-                await renditionRef.current!.display(target as string);
+                log.debug('Jumping with target:', { target, type: typeof target });
+                
+                // 关键修复：正确处理数字和字符串类型的目标
+                // 如果 target 是数字，需要转换为章节索引或生成位置
+                let displayTarget: string | number = target;
+                if (typeof target === 'number') {
+                    // 数字类型：尝试作为章节索引，或生成 CFI
+                    log.debug('Target is number, using as chapter index:', target);
+                    displayTarget = target;
+                }
+                
+                // 第一次跳转：到达目标
+                await renditionRef.current!.display(displayTarget);
+                
+                // 等待渲染稳定
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 获取当前位置
+                const currentLocation = renditionRef.current!.currentLocation();
+                log.debug('Current location after first jump:', currentLocation);
+                
+                // 注意：对于数字索引跳转，不要进行第二次对齐跳转
+                // 因为数字索引通常指向章节开始，已经在边界上
+                // 只有字符串 CFI 跳转才需要对齐
+                if (typeof target === 'string' && currentLocation && currentLocation.start) {
+                    const pageStartCfi = currentLocation.start.cfi;
+                    log.debug('String target - aligning to page start:', pageStartCfi);
+                    await renditionRef.current!.display(pageStartCfi);
+                    
+                    // 再等待一次确保第二次跳转完成
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    const finalLocation = renditionRef.current!.currentLocation();
+                    log.debug('Final location after alignment:', finalLocation);
+                }
+                
                 setIsReadyToSave(true);
                 // 2. If text provided, search and refine jump
                 if (jump.text) {
@@ -384,7 +490,36 @@ export default function EPUBReader({
       // 1. Jump to destination
       const tryJump = async (target: string | number, retry: boolean = true) => {
         try {
-            await renditionRef.current!.display(target as string);
+            log.debug('Pending jump with target:', { target, type: typeof target });
+            
+            // 关键修复：正确处理数字和字符串类型的目标
+            let displayTarget: string | number = target;
+            if (typeof target === 'number') {
+                log.debug('Pending jump - target is number:', target);
+                displayTarget = target;
+            }
+            
+            // 第一次跳转
+            await renditionRef.current!.display(displayTarget);
+            
+            // 等待渲染稳定
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // 获取当前位置
+            const currentLocation = renditionRef.current!.currentLocation();
+            log.debug('Pending jump - current location after first jump:', currentLocation);
+            
+            // 只有字符串 CFI 跳转才需要对齐，数字索引不需要
+            if (typeof target === 'string' && currentLocation && currentLocation.start) {
+                const pageStartCfi = currentLocation.start.cfi;
+                log.debug('Pending jump - aligning to page start:', pageStartCfi);
+                await renditionRef.current!.display(pageStartCfi);
+                
+                await new Promise(resolve => setTimeout(resolve, 200));
+                const finalLocation = renditionRef.current!.currentLocation();
+                log.debug('Pending jump - final location after alignment:', finalLocation);
+            }
+            
             setIsReadyToSave(true);
             pendingJumpRef.current = null;
             // 2. If text provided, search and refine jump

@@ -114,10 +114,10 @@ function ReaderContent() {
         // 优先级：URL参数 > 历史进度 > 第一页
         if (targetPage && targetPage > 0) {
           setCurrentPage(targetPage);
-          // 如果是 EPUB，需要设置 jumpRequest 来强制跳转
-          if (data.format?.toLowerCase() === 'epub') {
+          // Set jumpRequest for all formats to handle specific text highlighting
+          if (['epub', 'pdf', 'txt'].includes(data.format?.toLowerCase())) {
             setJumpRequest({
-              dest: targetPage - 1, // EPUB 0-based index
+              dest: targetPage - 1, // EPUB and PDFReader use 0-based index or equivalent logic
               text: searchText || undefined,
               word: targetWord || undefined,
               ts: Date.now()
@@ -133,6 +133,8 @@ function ReaderContent() {
   // Fetch Page Data (Words coordinates)
   useEffect(() => {
     if (!id) return;
+    // Clear immediately to prevent stale data usage during race condition
+    setPageData(null);
     log.debug('Fetching page data', { page: currentPage });
     fetch(`${API_URL}/api/books/${id}/pages/${currentPage}`)
       .then((res) => res.json())
@@ -173,6 +175,7 @@ function ReaderContent() {
     saveProgress(page);
     // 重置可见内容，等待新页面的文本提取
     setVisibleContent("");
+    setPageData(null); // Clear stale data to prevent using old coordinates
     setIsContentLoading(true); // 开始加载新页面内容
   };
 

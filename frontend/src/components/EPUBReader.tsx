@@ -167,9 +167,12 @@ export default function EPUBReader({
                    } else {
                         query = cleanWord;
                    }
-              } else {
-                   // Level 2: 兜底模式 - 仅搜索单词 (最不准确，但保证能找到)
+              } else if (retryLevel === 2) {
+                   // Level 2: 更宽松模式 - 仅搜索单词 (最不准确，但保证能找到)
                    query = cleanWord;
+              } else {
+                   // Level 3: 超宽松模式 - 搜索单词的前几个字母
+                   query = cleanWord.substring(0, Math.max(3, Math.floor(cleanWord.length / 2)));
               }
           } else {
               query = text.substring(0, 20).trim();
@@ -180,7 +183,10 @@ export default function EPUBReader({
           win.getSelection()?.removeAllRanges();
 
           // 关键修复：关闭 WholeWord (第5个参数设为 false)，允许部分匹配
-          if (win.find(query, false, false, true, false, true, false)) {
+          const findResult = win.find(query, false, false, true, false, true, false);
+          log.debug(`window.find() result: ${findResult}`, { query });
+
+          if (findResult) {
               log.debug('Search success!');
               const selection = win.getSelection();
               if (selection && selection.rangeCount > 0) {
@@ -292,7 +298,7 @@ export default function EPUBReader({
           // --- 搜索失败处理逻辑 ---
 
           // 如果是严格模式失败，先尝试降级，不翻页
-          if (retryLevel < 2) {
+          if (retryLevel < 3) {
               log.debug(`Level ${retryLevel} failed, retrying with Level ${retryLevel + 1}...`);
               return handleTextSearch(text, word, maxAttempts, pageOffset, retryLevel + 1);
           }

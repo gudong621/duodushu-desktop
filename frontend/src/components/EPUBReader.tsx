@@ -237,10 +237,11 @@ export default function EPUBReader({
 
                       if (cfi) {
                           log.info("Displaying CFI for alignment:", cfi);
-                          renditionRef.current!.display(cfi).catch((e: any) => log.info('CFI display failed (epub.js internal error):', e));
+                          // 静默处理 IndexSizeError - 这是 epub.js 内部错误，不影响功能
+                          renditionRef.current!.display(cfi).catch(() => {});
                       }
                   } catch (e) {
-                      log.info("Alignment correction failed (epub.js internal error):", e);
+                      // 静默处理对齐错误 - epub.js 内部错误，不影响功能
                   }
 
                   // --- 关键修复：使用 Overlay 而非修改 DOM 节点 ---

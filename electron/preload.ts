@@ -40,4 +40,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendMessage: (message: string) => ipcRenderer.send('message', message),
   // 示例：打开外部链接
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
+
+  // 菜单导航事件监听
+  onNavigate: (callback: (path: string) => void) => {
+    ipcRenderer.on('navigate', (_event, path: string) => callback(path));
+  },
+
+  // 菜单操作事件监听
+  onMenuAction: (callback: (action: string) => void) => {
+    ipcRenderer.on('menu-action', (_event, action: string) => callback(action));
+  },
+
+  // 移除导航事件监听
+  removeNavigateListener: () => {
+    ipcRenderer.removeAllListeners('navigate');
+  },
+
+  // 移除菜单操作事件监听
+  removeMenuActionListener: () => {
+    ipcRenderer.removeAllListeners('menu-action');
+  },
 });

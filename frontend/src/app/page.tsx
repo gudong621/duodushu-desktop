@@ -5,6 +5,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getBooks, deleteBook, updateBookType, Book } from '../lib/api';
 import UploadDialog from '../components/UploadDialog';
 import SettingsDialog from '../components/SettingsDialog';
+import MenuHandler from '../components/MenuHandler';
 import Link from 'next/link';
 
 export default function Home() {
@@ -326,6 +327,12 @@ export default function Home() {
           </div>
         </section>
       </div>
+
+      {/* Menu Handler - 处理 Electron 菜单事件 */}
+      <MenuHandler
+        onImportBook={() => setUploadDialogOpen(true)}
+        onOpenSettings={() => setSettingsDialogOpen(true)}
+      />
 
       {/* Upload Dialog */}
       <UploadDialog

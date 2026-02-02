@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { spawn, ChildProcess } from 'child_process';
 import * as util from 'util';
 import * as url from 'url';
+import { createApplicationMenu } from './menu';
 
 // Logging setup
 const logFile = path.join(app.getPath('userData'), 'startup.log');
@@ -85,6 +86,9 @@ async function createWindow() {
       allowRunningInsecureContent: true,
     },
   });
+
+  // 创建应用菜单
+  createApplicationMenu(mainWindow);
 
   if (IS_DEV) {
     // 开发模式：加载 Next.js 开发服务器

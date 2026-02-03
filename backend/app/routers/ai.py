@@ -564,4 +564,6 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"AI Chat Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process request")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process request: {str(e)}")

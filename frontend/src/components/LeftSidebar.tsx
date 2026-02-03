@@ -426,7 +426,7 @@ export default function LeftSidebar({
                         `}
                         title={`第 ${page} 页`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        { }
                         {isLoaded ? (
                           <img
                             src={thumbnailUrl}

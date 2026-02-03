@@ -417,7 +417,7 @@ interface ReaderProps {
   }, [words]);
 
   useEffect(() => {
-    let isExpanding = false;
+    const isExpanding = false;
     const handleSelectionChange = () => {
       // 禁用自定义选择逻辑，完全交给浏览器原生处理
       return; 

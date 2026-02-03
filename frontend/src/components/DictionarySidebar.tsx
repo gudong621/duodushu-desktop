@@ -5,6 +5,7 @@ import DictionaryContent from "./DictionaryContent";
 
 interface Definition {
   definition: string;
+  translation?: string;
   example?: string;
 }
 

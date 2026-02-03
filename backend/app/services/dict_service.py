@@ -595,7 +595,24 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
                     logger.warning(f"Lemma lookup failed for '{lemma}': {e}")
                     continue
 
-    # 2. Use Full ECDICT as Primary Local Fallback
+    # 2. Search Database Cache (before ECDICT, to avoid redundant lookups)
+    if not source or source == "AI":
+        db_res = db.query(CacheDictionary).filter(func.lower(CacheDictionary.word) == word.lower()).first()
+        if db_res:
+            data = db_res.data
+            result = {
+                "word": db_res.word,
+                "meanings": data.get("meanings", []),
+                "chinese_summary": data.get("chinese_summary"),
+                "chinese_translation": data.get("chinese_translation"),
+                "source": data.get("source"),
+                "cached": True,
+            }
+            if cn_translation:
+                result["chinese_translation"] = cn_translation
+            return result
+
+    # 3. Use Full ECDICT as Primary Local Fallback
     if ecdict_data:
         # Map ECDICT fields to frontend expected structure
         result = {
@@ -614,54 +631,70 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
         }
         return result
 
-    # 3. Search Database (Cache/Gemini generated)
+    # 4. Try AI (Fallback for Chinese translation)
     if not source or source == "AI":
-        db_res = db.query(CacheDictionary).filter(func.lower(CacheDictionary.word) == word.lower()).first()
-        if db_res:
-            data = db_res.data
-            result = {
-                "word": db_res.word,
-                "meanings": data.get("meanings", []),
-                "chinese_summary": data.get("chinese_summary"),
-                "chinese_translation": data.get("chinese_translation"),
-                "source": data.get("source"),
-                "cached": True,
-            }
-            if cn_translation:
-                result["chinese_translation"] = cn_translation
-            return result
+        try:
+            from .supplier_factory import chat_with_active_supplier, get_supplier_factory
 
-    # 3. Try Gemini AI (Preferred for Chinese translation)
-    # Note: gemini_service.lookup_word_ai() function doesn't exist, commented out
-    # ai_result = gemini_service.lookup_word_ai(word)
-    # # Gemini may return list or dict
-    # if ai_result:
-    #     # If it's a list, take the first item
-    #     if isinstance(ai_result, list) and len(ai_result) > 0:
-    #         ai_result = ai_result[0]
-    #
-    #     if isinstance(ai_result, dict):
-    #         # Add audio placeholder if Gemini doesn't provide it
-    #         try:
-    #             audio_resp = requests.get(FREE_DICT_API.format(word=word), timeout=1)
-    #             if audio_resp.status_code == 200:
-    #                 data = audio_resp.json()
-    #                 if isinstance(data, list) and data:
-    #                     for p in data[0].get("phonetics", []):
-    #                         if p.get("audio"):
-    #                             ai_result["audio_url"] = p["audio"]
-    #                             break
-    #         except:
-    #             pass
-    #
-    #         ai_result["cached"] = False
-    #
-    #         # Inject ECDICT translation if available
-    #         if cn_translation:
-    #             ai_result["chinese_translation"] = cn_translation
-    #
-    #         cache_service.save_dictionary_cache(db, word.lower(), ai_result)
-    #         return ai_result
+            # 检查是否有配置的 AI 供应商
+            factory = get_supplier_factory()
+            if factory.get_active_supplier_type():
+                prompt = f"""请为英文单词 "{word}" 提供以下信息，返回 JSON 格式（只返回 JSON，不要有其他文本）：
+{{
+    "word": "{word}",
+    "phonetic": "音标（如果知道）",
+    "chinese_translation": "中文翻译",
+    "meanings": [
+        {{
+            "partOfSpeech": "词性（如 noun, verb 等）",
+            "definitions": [
+                {{
+                    "definition": "英文定义",
+                    "translation": "中文翻译"
+                }}
+            ]
+        }}
+    ]
+}}"""
+
+                ai_response = chat_with_active_supplier(
+                    prompt,
+                    system_prompt="You are a professional English dictionary. Return only valid JSON.",
+                    temperature=0.1,
+                    max_tokens=1000
+                )
+
+                if ai_response:
+                    import json
+                    # 移除可能的 markdown 代码块标记
+                    response_text = ai_response.strip()
+                    if response_text.startswith("```"):
+                        response_text = response_text.split("```")[1]
+                        if response_text.startswith("json"):
+                            response_text = response_text[4:]
+                    response_text = response_text.strip()
+
+                    try:
+                        ai_result = json.loads(response_text)
+                        ai_result["source"] = "AI"
+                        ai_result["cached"] = False
+
+                        # 如果 ECDICT 有翻译，优先使用 ECDICT 的翻译
+                        if cn_translation:
+                            ai_result["chinese_translation"] = cn_translation
+
+                        # 缓存 AI 结果
+                        cache_service.save_dictionary_cache(db, word.lower(), ai_result)
+                        logger.info(f"Found via AI: {word}")
+                        return ai_result
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"AI 返回的 JSON 解析失败: {e}")
+            else:
+                logger.debug("未配置 AI 供应商，跳过 AI 词典查询")
+        except Exception as e:
+            logger.warning(f"AI 词典查询失败: {e}")
+
+
 
     # 4. Fallback to Free Dictionary API
     try:

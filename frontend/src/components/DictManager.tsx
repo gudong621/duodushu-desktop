@@ -134,8 +134,8 @@ export function DictManager() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
-        <div className="text-sm text-gray-500">
-          提示：拖拽导入词典可调整查词时的顺序
+        <div className="text-sm text-gray-600">
+          💡 提示：拖拽导入词典可调整查词优先级（靠前的词典优先级更高）
         </div>
         <button
           onClick={() => setShowImportDialog(true)}

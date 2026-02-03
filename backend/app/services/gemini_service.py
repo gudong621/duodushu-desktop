@@ -76,7 +76,7 @@ def translate_text(text: str, target_lang: str = "中文") -> Optional[str]:
     model = get_model()
     if not model:
         return None
-        
+
     prompt = f"请将以下文本翻译成{target_lang}，只返回翻译结果，不要有任何解释：\n\n{text}"
     try:
         response = model.generate_content(prompt)
@@ -84,3 +84,5 @@ def translate_text(text: str, target_lang: str = "中文") -> Optional[str]:
     except Exception as e:
         logger.error(f"Gemini 翻译失败: {e}")
         return None
+
+

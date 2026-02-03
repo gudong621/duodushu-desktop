@@ -93,46 +93,37 @@ def classify_user_intent(
         "chapter summary",
     ]
 
-    # 强制排除项：如果包含“这一页”、“本页”、“当前页”、“讲解”、“这段内容”等，优先进入单页模式
+    # 1. 强制排除项：优先进入单页英语学习模式（具有最高优先级）
     page_keywords = [
         "这一页", "本页", "当前页", "this page", "current page",
-        "讲解", "这段", "解析", "下一段", "这段内容", "explain this", "analyze this"
+        "讲解", "这段", "解析", "下一段", "这段内容", "explain this", "analyze this",
+        "翻译", "单词", "语法", "解释", "句子"
     ]
     if any(kw in lower_msg for kw in page_keywords):
         logger.info(f"检测到页面指令关键词，设为单页学习模式: {lower_msg}")
         return "language_learning"
 
-    # 明确的全书/定位关键词
+    # 2. 内容定位关键词 (content_location)
+    if any(kw in lower_msg for kw in location_keywords):
+        return "content_location"
+
+    # 3. 阅读理解关键词 (reading_comprehension)
+    if any(kw in lower_msg for kw in comprehension_keywords):
+        return "reading_comprehension"
+
+    # 4. 知识检索关键词 (knowledge_retrieval)
+    if any(kw in lower_msg for kw in retrieval_keywords):
+        return "knowledge_retrieval"
+
+    # 5. 明确的全书范围关键词 (兜底进入检索模式)
     book_scope_keywords = [
-        # 范围词
-        "全书",
-        "整本",
-        "这本书",
-        "whole book",
-        "entire book",
-        # 定位词
-        "在哪里",
-        "哪一页",
-        "第几页",
-        "找一下",
-        "位置",
-        "where",
-        "which page",
-        "find",
-        "locate",
-        # 跨章节词
-        "结局",
-        "ending",
-        "伏笔",
-        "之前",
-        "后文",
+        "全书", "整本", "这本书", "whole book", "entire book",
+        "位置", "locate", "伏笔", "之前", "后文"
     ]
-
     if any(kw in lower_msg for kw in book_scope_keywords):
-        return "knowledge_retrieval"  # 统称为知识检索
+        return "knowledge_retrieval"
 
-    # 默认回落到单页模式
-    # 包括：翻译、解释、总结(默认本页)、语法、词汇等
+    # 默认回落到单页学习模式
     return "language_learning"
 
 

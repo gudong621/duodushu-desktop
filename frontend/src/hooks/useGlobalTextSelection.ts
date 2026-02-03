@@ -96,7 +96,7 @@ export function useGlobalTextSelection(
       }
 
       // 限制最大选择长度（防止选中整个页面）
-      if (text.length > 1000) {
+      if (text.length > 5000) {
         setSelection(null);
         lastSelectionTextRef.current = "";
         lastSelectionRangeRef.current = null;
@@ -118,15 +118,15 @@ export function useGlobalTextSelection(
       const rect = range.getBoundingClientRect();
 
       // 检测选择区域尺寸：如果超出合理范围，可能是跨区域误选
-      // 高度超过 500px 或宽度超过 1200px 视为异常
-      if (rect.height > 500 || rect.width > 1200) {
+      // 高度超过 1000px 或宽度超过 1600px 视为异常
+      if (rect.height > 1000 || rect.width > 1600) {
         setSelection(null);
         lastSelectionTextRef.current = "";
         lastSelectionRangeRef.current = null;
         return;
       }
 
-      // 检测鼠标松开位置是否在选择区域附近（300px 范围内）
+      // 检测鼠标松开位置是否在选择区域附近（500px 范围内）
       // 如果鼠标跑太远说明是误触全选
       if (mouseUpPositionRef.current) {
         const mouseX = mouseUpPositionRef.current.x;
@@ -137,8 +137,8 @@ export function useGlobalTextSelection(
           Math.abs(mouseY - rect.top),
           Math.abs(mouseY - rect.bottom)
         );
-        // 如果鼠标距离选择区域超过 300px，忽略
-        if (distanceToRect > 300) {
+        // 如果鼠标距离选择区域超过 500px，忽略
+        if (distanceToRect > 500) {
           setSelection(null);
           lastSelectionTextRef.current = "";
           lastSelectionRangeRef.current = null;

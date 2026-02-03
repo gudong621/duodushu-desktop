@@ -189,6 +189,12 @@ async def lifespan(app: FastAPI):
     logger.info("启动后台任务调度器...")
     try:
         scheduler.start()
+        
+        # 启动自检：直接触发一次优先级更新（针对本地客户端补更）
+        import threading
+        logger.info("触发启动补更：在后台线程中更新单词优先级...")
+        threading.Thread(target=scheduled_priority_update, daemon=True).start()
+        
     except Exception as e:
         logger.warning(f"调度器启动警告: {e}")
     yield

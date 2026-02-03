@@ -586,7 +586,7 @@ function DictionarySidebar({
 
             {/* Content Display */}
             {/* 当没有启用的导入词典时，显示提示 */}
-            {sources.length === 0 && !(wordData as any)?.multiple_sources ? (
+            {sources.length === 0 && !(wordData as any)?.multiple_sources && !(wordData as any)?.is_ai ? (
               <div className="min-h-[200px] flex flex-col items-center justify-center text-center py-12">
                 <div className="w-16 h-16 mb-4 text-gray-300">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -597,6 +597,49 @@ function DictionarySidebar({
                 <p className="text-gray-400 text-xs">
                   前往 <a href="/dicts" className="text-blue-500 hover:underline">词典管理</a> 导入并启用词典
                 </p>
+              </div>
+            ) : (wordData as any)?.is_ai ? (
+              // AI 模式：直接显示结构化内容
+              <div className="min-h-[200px] relative">
+                {loading ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-10 rounded-lg">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
+                    <p className="text-sm text-gray-600">正在查询 AI 词典...</p>
+                    <p className="text-xs text-gray-400 mt-1">这可能需要几秒钟</p>
+                  </div>
+                ) : null}
+                {/* Structured Content (AI-generated) */}
+                <div className="space-y-6">
+                  {wordData.meanings?.map((m, i) => (
+                    <div key={i}>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-3">
+                        {m.partOfSpeech}
+                      </span>
+                      <ul className="space-y-4">
+                        {m.definitions.map((def, j) => (
+                          <li
+                            key={j}
+                            className="text-sm pl-4 relative before:absolute before:left-0 before:top-1.5 before:w-1 before:h-1 before:bg-gray-300 before:rounded-full"
+                          >
+                            <div className="text-gray-800 leading-relaxed">
+                              {def.definition}
+                            </div>
+                            {def.translation && (
+                              <div className="text-gray-500 text-sm mt-1">
+                                {def.translation}
+                              </div>
+                            )}
+                            {def.example && (
+                              <div className="text-gray-400 text-xs mt-1 italic">
+                                &quot;{def.example}&quot;
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (wordData as any)?.multiple_sources ? (
               // 多词典模式：只显示当前选中标签对应的词典内容

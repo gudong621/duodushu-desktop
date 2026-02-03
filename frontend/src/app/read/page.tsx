@@ -628,6 +628,12 @@ function ReaderContent() {
         // If switching to a specific source, query only that source
         if (isSource && sourceOrContext) {
           data = await lookupWord(word, sourceOrContext);
+
+          // 如果指定的导入词典中没有找到，尝试查询所有来源（包括 AI 兜底）
+          if (!data) {
+            console.log(`[Dictionary] Not found in ${sourceOrContext}, trying all sources including AI...`);
+            data = await lookupWord(word);
+          }
         } else {
           // 直接调用 lookupWord(word) 不传 source 参数
           // 后端会自动查询所有启用的词典并聚合结果,包含 chinese_translation

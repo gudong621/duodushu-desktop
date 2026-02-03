@@ -445,6 +445,94 @@ def lookup_word_all_sources(db: Session, word: str) -> Optional[Dict]:
                         }
                     ],
                 }
+
+            # ECDICT 也没找到，尝试 AI 兜底查询
+            logger.info(f"[lookup_word_all_sources] Not found in any imported dict or ECDICT, trying AI fallback for word: {word}")
+            try:
+                from ..services import supplier_factory
+
+                # 使用 AI 定义单词
+                prompt = f"""Please define the English word "{word}" in the following JSON format:
+{{
+    "word": "{word}",
+    "phonetic": "[phonetic transcription if available]",
+    "meanings": [
+        {{
+            "partOfSpeech": "part of speech",
+            "definitions": [
+                {{
+                    "definition": "clear definition in English",
+                    "translation": "Chinese translation"
+                }}
+            ]
+        }}
+    ]
+}}
+
+Return ONLY the JSON, no other text."""
+
+                response = supplier_factory.chat_with_active_supplier(
+                    prompt,
+                    history=[],
+                    temperature=0.3
+                )
+
+                if response:
+                    logger.info(f"[lookup_word_all_sources] AI response for word {word}: {response[:200]}...")
+
+                    # 尝试解析 JSON 响应
+                    import json
+                    import re
+
+                    # 提取 JSON（去除可能的 markdown 代码块）
+                    json_match = re.search(r'```json\s*(.*?)\s*```', response, re.DOTALL)
+                    if json_match:
+                        response = json_match.group(1).strip()
+                    else:
+                        # 尝试直接提取 JSON 对象
+                        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                        if json_match:
+                            response = json_match.group(0).strip()
+
+                    logger.info(f"[lookup_word_all_sources] Extracted JSON for word {word}: {response[:200]}...")
+                    ai_data = json.loads(response)
+                    logger.info(f"[lookup_word_all_sources] Parsed AI data for word {word}: {ai_data}")
+
+                    # 构造返回结果
+                    result = {
+                        "word": ai_data.get("word", word),
+                        "source": "AI",
+                        "is_ai": True,
+                        "phonetic": ai_data.get("phonetic", ""),
+                        "chinese_translation": "",
+                    }
+
+                    # 处理 meanings
+                    meanings = ai_data.get("meanings", [])
+                    if meanings:
+                        result["meanings"] = []
+                        for meaning in meanings:
+                            definitions = meaning.get("definitions", [])
+                            if definitions:
+                                result["meanings"].append({
+                                    "partOfSpeech": meaning.get("partOfSpeech", ""),
+                                    "definitions": definitions
+                                })
+
+                        # 获取第一个中文翻译作为整体翻译
+                        if definitions and definitions[0].get("translation"):
+                            result["chinese_translation"] = definitions[0]["translation"]
+
+                    logger.info(f"[lookup_word_all_sources] AI fallback successful for word: {word}")
+                    return result
+                else:
+                    logger.warning(f"[lookup_word_all_sources] AI returned empty response for word {word}")
+
+            except Exception as e:
+                logger.warning(f"[lookup_word_all_sources] AI fallback failed for word {word}: {e}")
+                import traceback
+                logger.warning(f"[lookup_word_all_sources] Traceback: {traceback.format_exc()}")
+
             return None
 
         # 只有一个词典有结果，直接返回（使用单词典模式）
@@ -558,13 +646,25 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
 
     # If found in MDX, return it with ECDICT translation and phonetic as supplement
     if imported_res:
-        logger.info(f"Found in dictionary: {imported_res.get('source', 'unknown')}")
-        if cn_translation:
-            imported_res["chinese_translation"] = cn_translation
-        # 始终使用 ECDICT 的音标，覆盖导入词典的音标
-        if ecdict_phonetic:
-            imported_res["phonetic"] = ecdict_phonetic
-        return imported_res
+        # 检查返回的数据是否有效（meanings 不为空，或者 html_content 不包含错误信息）
+        meanings = imported_res.get("meanings", [])
+        html_content = imported_res.get("html_content", "")
+        is_valid = (
+            (meanings and len(meanings) > 0) or
+            (html_content and "error" not in html_content.lower() and "no definition found" not in html_content.lower())
+        )
+
+        if not is_valid:
+            logger.info(f"Dictionary returned invalid result for word '{word}', treating as not found")
+            imported_res = None
+        else:
+            logger.info(f"Found in dictionary: {imported_res.get('source', 'unknown')}")
+            if cn_translation:
+                imported_res["chinese_translation"] = cn_translation
+            # 始终使用 ECDICT 的音标，覆盖导入词典的音标
+            if ecdict_phonetic:
+                imported_res["phonetic"] = ecdict_phonetic
+            return imported_res
 
     # 1.5. 尝试词形还原后重新查询 MDX（仅在 MDX 查询失败时）
     if _should_try_lemma(original_word, imported_res):
@@ -725,6 +825,13 @@ def lookup_word(db: Session, word: str, source: Optional[str] = None) -> Optiona
     except Exception as e:
         logger.error(f"Dictionary API error: {e}")
 
+    # 如果指定了 source 但没有找到结果，返回 None 而不是默认的错误页面
+    # 这样前端会执行第二次查询（不指定 source 的 AI 兜底查询）
+    if source:
+        logger.info(f"No definition found for word '{word}' in source '{source}', returning None to trigger fallback")
+        return None
+
+    # 如果没有指定 source，返回默认的错误页面
     return {
         "word": word,
         "phonetic": "/.../",

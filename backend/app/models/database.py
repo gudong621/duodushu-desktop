@@ -7,7 +7,9 @@ from app.config import DB_PATH, BASE_DIR, UPLOADS_DIR, DICTS_DIR
 load_dotenv()
 
 # 使用 config.py 中定义的 DB_PATH
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+# 在 Windows 上，sqlite:///D:\... 可能不稳定，使用绝对路径处理
+db_abs_path = os.path.abspath(DB_PATH)
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{db_abs_path}")
 
 # 确保父目录存在
 if DB_PATH.parent and not DB_PATH.parent.exists():

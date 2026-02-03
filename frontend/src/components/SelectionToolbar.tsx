@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 interface SelectionState {
   text: string;
@@ -8,6 +8,7 @@ interface SelectionState {
   y: number;
   source?: string;
   rect?: DOMRect;
+  range?: Range; // 保存原始 Range 用于恢复选区
 }
 
 interface SelectionToolbarProps {
@@ -30,6 +31,61 @@ export default function SelectionToolbar({
   hidden = false,
 }: SelectionToolbarProps) {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const clonedRangeRef = useRef<Range | null>(null);
+
+  // 克隆 Range（原始 Range 可能会失效）
+  // 注意：Range 已经在 useGlobalTextSelection 中被克隆，这里再次克隆以确保安全
+  useEffect(() => {
+    if (selection?.range) {
+      try {
+        clonedRangeRef.current = selection.range.cloneRange();
+      } catch (e) {
+        clonedRangeRef.current = null;
+      }
+    } else {
+      clonedRangeRef.current = null;
+    }
+  }, [selection?.range]);
+
+  // 恢复选区高亮
+  const restoreSelection = useCallback(() => {
+    const rangeToRestore = clonedRangeRef.current || selection?.range;
+    if (rangeToRestore) {
+      try {
+        const sel = window.getSelection();
+        if (sel) {
+          // 检查当前选区是否已经是我们期望的选区
+          if (sel.rangeCount > 0) {
+            const currentRange = sel.getRangeAt(0);
+            // 如果选区文本相同，不需要重新设置
+            try {
+              if (currentRange.toString() === rangeToRestore.toString()) {
+                return;
+              }
+            } catch (e) {
+              // Range 可能已失效
+            }
+          }
+          sel.removeAllRanges();
+          sel.addRange(rangeToRestore.cloneRange()); // 使用克隆避免修改原始 Range
+        }
+      } catch (e) {
+        // Range 可能已失效，忽略错误
+        console.warn('[SelectionToolbar] Failed to restore selection:', e);
+      }
+    }
+  }, [selection?.range]);
+
+  // 工具栏出现时立即尝试恢复选区
+  useEffect(() => {
+    if (selection && !hidden) {
+      // 使用 requestAnimationFrame 确保在 DOM 更新后执行
+      const frameId = requestAnimationFrame(() => {
+        restoreSelection();
+      });
+      return () => cancelAnimationFrame(frameId);
+    }
+  }, [selection, hidden, restoreSelection]);
 
   // 计算工具栏位置，避免超出视口
   const calculatePosition = useCallback(() => {
@@ -108,6 +164,7 @@ export default function SelectionToolbar({
         top: `${position.y}px`,
         transform: 'translateX(-50%)',
       }}
+      onMouseEnter={restoreSelection}
       onMouseDown={(e) => {
         e.preventDefault();
         e.stopPropagation();

@@ -8,6 +8,7 @@ interface SelectionState {
   y: number;
   source?: 'pdf' | 'epub' | 'dictionary' | 'ai' | 'notes' | 'vocab' | 'general';
   rect: DOMRect;
+  range?: Range; // 克隆的 Range 用于恢复选区
 }
 
 export function useGlobalTextSelection(
@@ -20,11 +21,19 @@ export function useGlobalTextSelection(
   const lastSelectionRangeRef = useRef<Range | null>(null);
   const isMouseDownRef = useRef<boolean>(false);
   const mouseUpPositionRef = useRef<{ x: number; y: number } | null>(null);
+  // 跟踪当前是否有活跃的选区（工具栏正在显示）
+  const hasActiveSelectionRef = useRef<boolean>(false);
+  // 记录选区建立的时间戳，用于防止误清除
+  const selectionTimestampRef = useRef<number>(0);
 
-  const clearSelection = useCallback(() => {
+  // 清除选区（可选是否同时清除浏览器原生高亮）
+  const clearSelection = useCallback((clearNativeSelection: boolean = true) => {
     setSelection(null);
-    const sel = window.getSelection();
-    if (sel) sel.removeAllRanges();
+    hasActiveSelectionRef.current = false;
+    if (clearNativeSelection) {
+      const sel = window.getSelection();
+      if (sel) sel.removeAllRanges();
+    }
   }, []);
 
   const isSelectionExcluded = useCallback((node: Node | null): boolean => {
@@ -61,6 +70,12 @@ export function useGlobalTextSelection(
       const sel = window.getSelection();
 
       if (!sel || sel.isCollapsed) {
+        // 防止选区刚刚建立时被意外清除（例如由于 DOM 更新导致的选区临时丢失）
+        const timeSince = Date.now() - selectionTimestampRef.current;
+        if (hasActiveSelectionRef.current && timeSince < 1000) {
+           return;
+        }
+
         setSelection(null);
         lastSelectionTextRef.current = "";
         lastSelectionRangeRef.current = null;
@@ -75,6 +90,10 @@ export function useGlobalTextSelection(
       const text = sel.toString().trim();
 
       if (!text) {
+        const timeSince = Date.now() - selectionTimestampRef.current;
+        if (hasActiveSelectionRef.current && timeSince < 1000) {
+           return;
+        }
         setSelection(null);
         lastSelectionTextRef.current = "";
         lastSelectionRangeRef.current = null;
@@ -196,15 +215,27 @@ export function useGlobalTextSelection(
       const viewportWidth = window.innerWidth;
       const adjustedX = Math.min(Math.max(rect.left + rect.width / 2, 60), viewportWidth - 60);
 
+      // 立即克隆 Range，避免原始 Range 被浏览器修改或失效
+      let clonedRange: Range | undefined;
+      try {
+        clonedRange = range.cloneRange();
+      } catch (e) {
+        // 克隆失败时不保存 range
+      }
+
       setSelection({
         text,
         x: adjustedX,
         y: adjustedY,
         source,
         rect,
+        range: clonedRange, // 保存克隆的 Range 用于后续恢复选区
       });
 
-      lastSelectionRangeRef.current = range;
+      // 标记选区为活跃状态，记录时间戳
+      hasActiveSelectionRef.current = true;
+      selectionTimestampRef.current = Date.now();
+      lastSelectionRangeRef.current = clonedRange || null;
     }, 300);  // 增加防抖时间到 300ms
   }, [enabled, isSelectionExcluded, selection]);
 
@@ -249,14 +280,47 @@ export function useGlobalTextSelection(
     // 监听点击事件，用于清除选择
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // 如果点击的不是工具栏内部，清除选择
-      if (!target.closest('[data-selection-toolbar]')) {
-        // 延迟清除，给工具栏操作留出时间
-        setTimeout(() => {
-          setSelection(null);
-          lastSelectionTextRef.current = "";
-        }, 100);
+      // 如果点击的是工具栏内部，不做任何处理
+      if (target.closest('[data-selection-toolbar]')) {
+        return;
       }
+      
+      // 如果没有活跃的选区，不需要处理
+      if (!hasActiveSelectionRef.current) {
+        return;
+      }
+      
+      // 如果选区刚刚建立（800ms内），不清除（防止工具栏出现后立即被点击事件清除）
+      const timeSinceSelection = Date.now() - selectionTimestampRef.current;
+      if (timeSinceSelection < 800) {
+        return;
+      }
+      
+      // 检查浏览器是否仍有选区存在（用户可能仍在选择文本）
+      const browserSelection = window.getSelection();
+      if (browserSelection && browserSelection.toString().trim().length > 0) {
+        // 如果仍有选区，且鼠标当前还在按下状态，不清除
+        if (isMouseDownRef.current) {
+          return;
+        }
+      }
+      
+      // 延迟清除，给工具栏操作留出时间
+      setTimeout(() => {
+        // 再次检查是否在工具栏上（用户可能在延迟期间移动到了工具栏）
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement?.closest('[data-selection-toolbar]')) {
+          return;
+        }
+        // 再次检查保护期
+        const timeSince = Date.now() - selectionTimestampRef.current;
+        if (timeSince < 800) {
+          return;
+        }
+        setSelection(null);
+        hasActiveSelectionRef.current = false;
+        lastSelectionTextRef.current = "";
+      }, 150);
     };
 
     document.addEventListener('click', handleClickOutside);

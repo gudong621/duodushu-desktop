@@ -14,10 +14,10 @@ def test_intent_classification():
     assert classify_user_intent("Explain this page") == "language_learning"
 
     # 2. 知识库检索模式
-    assert classify_user_intent("这本书讲了什么？") == "knowledge_retrieval"
-    assert classify_user_intent("黑洞在哪里提到过？") == "knowledge_retrieval"
-    assert classify_user_intent("What is the ending?") == "knowledge_retrieval"
-    assert classify_user_intent("Locate the chapter about stars") == "knowledge_retrieval"
+    assert classify_user_intent("这本书讲了什么？") == "reading_comprehension"
+    assert classify_user_intent("黑洞在哪里提到过？") == "content_location"
+    assert classify_user_intent("What is the ending?") == "reading_comprehension"
+    assert classify_user_intent("Locate the chapter about stars") == "content_location"
 
     # 3. 默认回落
     assert classify_user_intent("Hello") == "language_learning"

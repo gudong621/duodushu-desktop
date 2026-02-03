@@ -44,35 +44,6 @@ export default function DictsPage() {
         <section>
           <DictManager />
         </section>
-
-        <section className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">使用说明</h2>
-          <div className="space-y-4 text-gray-600 text-sm">
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">📁 导入词典</h3>
-              <ul className="space-y-1 ml-4">
-                <li>• 支持 MDX 和 ZIP 格式的词典文件</li>
-                <li>• 导入后会自动建立索引，大文件可能需要几分钟</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">🔄 排序与优先级</h3>
-              <ul className="space-y-1 ml-4">
-                <li>• 拖拽导入词典可调整查词时的优先级顺序</li>
-                <li>• 排序越靠前的词典，查询时优先级越高</li>
-                <li>• 查询顺序：内置词典 → 导入词典 → AI（兜底）</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">⚙️ 管理词典</h3>
-              <ul className="space-y-1 ml-4">
-                <li>• 通过勾选框启用或禁用已导入的词典</li>
-                <li>• 禁用的词典不会参与查询，但文件和索引会保留</li>
-                <li>• 删除词典将从系统中移除相关文件和索引，此操作不可恢复</li>
-              </ul>
-            </div>
-          </div>
-        </section>
       </div>
     </main>
   );

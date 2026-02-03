@@ -1131,17 +1131,34 @@ export default function EPUBReader({
                                  onContentChange(text);
                              } catch (rangeOpErr) {
                                  log.debug('INIT SYNC - Range operation failed (offsets may be stale):', rangeOpErr);
-                                 onContentChange(rangeStart.toString()); // Fallback to start point only
+                                 // Fallback: Safe truncation
+                                 const startText = rangeStart.toString().trim();
+                                 if (startText.length > 2000) {
+                                     onContentChange(startText.substring(0, 2000) + "\n...(truncated)");
+                                 } else {
+                                     onContentChange(startText);
+                                 }
                              }
                          } else {
                              // Fallback for cross-chapter or detached nodes
-                             const text = (rangeStart.toString() + "\n...\n" + rangeEnd.toString()).trim();
-                             log.debug('INIT SYNC (Fallback) - Text length:', text.length);
-                             onContentChange(text);
+                             const sText = rangeStart.toString().trim();
+                             const eText = rangeEnd.toString().trim();
+                             const combined = sText + "\n...\n" + eText;
+                             if (combined.length > 5000) {
+                                 onContentChange(combined.substring(0, 5000) + "\n...(truncated)");
+                             } else {
+                                 onContentChange(combined);
+                             }
+                             log.debug('INIT SYNC (Fallback) - Text length truncated check used');
                          }
                      } else if (rangeStart) {
                          // 只有 start 成功
-                         onContentChange(rangeStart.toString());
+                         const startText = rangeStart.toString().trim();
+                         if (startText.length > 3000) {
+                             onContentChange(startText.substring(0, 2000) + "\n...(truncated)");
+                         } else {
+                             onContentChange(startText);
+                         }
                      }
                    } catch (err) {
                      log.debug('Manual range construction failed (likely IndexSizeError from epub.js):', err);
@@ -1202,9 +1219,30 @@ export default function EPUBReader({
             }
             setForceSave(prev => prev + 1);
 
-            // Sync page number (chapter index + 1) to parent for accurate context saving
-            if (onPageChange && typeof location.start.index === 'number') {
-                onPageChange(location.start.index + 1);
+            // Sync page number: Prioritize virtual page location, fallback to chapter index
+            if (onPageChange) {
+                let pageNum = 0;
+                // Try to get precise page number from locations
+                if (locationsReady && book.locations.length() > 0) {
+                    try {
+                        pageNum = book.locations.locationFromCfi(cfi);
+                    } catch (e) {
+                         // ignore
+                    }
+                }
+                
+                // Fallback to chapter index if location not available
+                if ((!pageNum || pageNum <= 0) && typeof location.start.index === 'number') {
+                    // Start chapter numbering from 10000 to distinguish? No, just use simple index + 1
+                    // But if we mix, it might be confusing. 
+                    // However, standard flow is: if locations generated, we get 1, 2, 3...
+                    // If not, we get 1, 2, 3 (chapters).
+                    pageNum = location.start.index + 1;
+                }
+
+                if (pageNum > 0) {
+                    onPageChange(pageNum);
+                }
             }
 
             // 新增：提取并回传当前页可见内容（带防抖）
@@ -1249,17 +1287,41 @@ export default function EPUBReader({
                                  text = range.toString().trim();
                              } catch (rangeOpErr) {
                                  log.debug('Relocated sync - Range operation failed:', rangeOpErr);
-                                 text = rangeStart.toString().trim();
+                                 // Fallback: Safe truncation if start range is too large (likely whole chapter/wrapper)
+                                 const startText = rangeStart.toString().trim();
+                                 if (startText.length > 2000) {
+                                     // Likely an element fallback, truncate
+                                     text = startText.substring(0, 2000) + "\n...(truncated)";
+                                 } else {
+                                     text = startText;
+                                 }
                              }
-                         } else {
-                             text = (rangeStart.toString() + "\n...\n" + rangeEnd.toString()).trim();
-                         }
-                    } else if (rangeStart) {
-                         text = rangeStart.toString().trim();
-                    }
-                  } catch (rangeErr) {
-                    log.debug('Range extraction failed, trying fallback...');
-                  }
+                        } else {
+                             // Fallback for cross-document (unlikely in single-view) or disconnected nodes
+                             const sText = rangeStart.toString().trim();
+                             const eText = rangeEnd.toString().trim();
+                             // If fallback creates massive text, truncate
+                             const combined = sText + "\n...\n" + eText;
+                             if (combined.length > 5000) {
+                                 text = combined.substring(0, 5000) + "\n...(truncated)";
+                             } else {
+                                 text = combined;
+                             }
+                        }
+                   } else if (rangeStart) {
+                        // Only start range available (end failed)
+                        const startText = rangeStart.toString().trim();
+                        // 关键修复: 如果只有 start 且内容极长，说明可能选中了整个章节容器
+                        if (startText.length > 3000) { 
+                             log.warn('Fallback extraction used start-only which is very long, truncating.');
+                             text = startText.substring(0, 2000) + "\n...(truncated)";
+                        } else {
+                             text = startText;
+                        }
+                   }
+                 } catch (rangeErr) {
+                   log.debug('Range extraction failed, trying fallback...');
+                 }
                   
                   // 2. 如果主方式失败或结果为空，尝试兜底方式：单点提取
                   if (!text) {

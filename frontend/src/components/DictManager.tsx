@@ -75,20 +75,31 @@ export function DictManager() {
     setDraggedItem(dictName);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, dict: DictInfo) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    // 内置词典不允许作为放置目标
+    if (dict.is_builtin) {
+      e.dataTransfer.dropEffect = 'none';
+    } else {
+      e.dataTransfer.dropEffect = 'move';
+    }
   };
 
-  const handleDrop = async (targetDictName: string) => {
-    if (!draggedItem || draggedItem === targetDictName) {
+  const handleDrop = async (targetDict: DictInfo) => {
+    if (!draggedItem || draggedItem === targetDict.name) {
+      setDraggedItem(null);
+      return;
+    }
+
+    // 内置词典不允许作为放置目标
+    if (targetDict.is_builtin) {
       setDraggedItem(null);
       return;
     }
 
     // 找到拖拽项和目标项的索引
     const draggedIndex = dicts.findIndex(d => d.name === draggedItem);
-    const targetIndex = dicts.findIndex(d => d.name === targetDictName);
+    const targetIndex = dicts.findIndex(d => d.name === targetDict.name);
 
     if (draggedIndex === -1 || targetIndex === -1) {
       setDraggedItem(null);
@@ -133,10 +144,7 @@ export function DictManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
-        <div className="text-sm text-gray-600">
-          💡 提示：拖拽导入词典可调整查词优先级（靠前的词典优先级更高）
-        </div>
+      <div className="flex justify-end mb-6">
         <button
           onClick={() => setShowImportDialog(true)}
           className="bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-800 transition-colors"
@@ -154,8 +162,8 @@ export function DictManager() {
               key={dict.name}
               draggable={dict.type === 'imported'}
               onDragStart={() => handleDragStart(dict.name)}
-              onDragOver={handleDragOver}
-              onDrop={() => handleDrop(dict.name)}
+              onDragOver={(e) => handleDragOver(e, dict)}
+              onDrop={() => handleDrop(dict)}
               className={`bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-md transition-all ${
                 draggedItem === dict.name ? 'opacity-50 bg-gray-50' : ''
               } ${dict.type === 'imported' ? 'cursor-move' : ''}`}

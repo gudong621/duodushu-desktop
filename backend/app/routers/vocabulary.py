@@ -275,12 +275,24 @@ def add_vocabulary(
             if not translation and data.definition and "chinese_summary" in data.definition:
                 translation = data.definition["chinese_summary"]
 
+            # Try to get phonetic from definition or ECDICT
+            phonetic = None
+            if data.definition and "phonetic" in data.definition:
+                phonetic = data.definition["phonetic"]
+            
+            if not phonetic:
+                # Fallback to ECDICT lookup
+                from ..services import ecdict_service
+                ecdict_data = ecdict_service.get_word_details(data.word)
+                if ecdict_data and ecdict_data.get("phonetic"):
+                    phonetic = ecdict_data["phonetic"]
+
             # Create new vocabulary
             result = db.execute(
                 text("""
                 INSERT INTO vocabulary
-                    (word, book_id, page_number, context, translation, definition)
-                VALUES (:word, :book_id, :page_number, :context, :translation, :definition)
+                    (word, book_id, page_number, context, translation, definition, phonetic)
+                VALUES (:word, :book_id, :page_number, :context, :translation, :definition, :phonetic)
             """),
                 {
                     "word": data.word,
@@ -289,6 +301,7 @@ def add_vocabulary(
                     "context": data.context_sentence,
                     "translation": translation,
                     "definition": json.dumps(data.definition) if data.definition else None,
+                    "phonetic": phonetic,
                 },
             )
 

@@ -134,6 +134,16 @@ async def language_learning_chat(request: ChatRequest):
     from ..services import supplier_factory
     from ..services.deepseek_service import SYSTEM_PROMPT_TEACHER
 
+    # 检查是否已配置 AI 供应商
+    factory = supplier_factory.get_supplier_factory()
+    active_supplier = factory.get_active_supplier_config()
+    if not active_supplier or not active_supplier.enabled:
+        return {
+            "reply": "⚠️ **未配置 AI 服务**\n\n您还没有配置 AI 供应商。请按以下步骤操作：\n\n1. 点击首页右上角的设置图标 ⚙️\n2. 在「AI 供应商」中选择一个服务（如 DeepSeek、Gemini、OpenAI 等）\n3. 填入对应的 API 密钥\n4. 点击「保存配置」\n\n配置完成后即可正常使用 AI 老师功能。",
+            "role": "assistant",
+            "error_type": "no_supplier"
+        }
+
     # 构建带上下文的消息
     content_prompt = ""
     if request.page_content and request.book_title and request.current_page:
@@ -157,7 +167,13 @@ async def language_learning_chat(request: ChatRequest):
 
     if reply:
         return {"reply": reply, "role": "assistant"}
-    return None
+
+    # API 调用失败
+    return {
+        "reply": "⚠️ **AI 服务调用失败**\n\n可能的原因：\n\n1. **API 密钥无效或已过期** - 请检查配置的密钥是否正确\n2. **网络连接问题** - 请检查网络连接是否正常\n3. **API 服务暂时不可用** - 请稍后再试\n4. **配额已用尽** - 请检查您的账户余额\n\n您可以点击首页右上角的设置图标 ⚙️ 重新配置 AI 供应商。",
+        "role": "assistant",
+        "error_type": "api_call_failed"
+    }
 
 
 # ========== 策略：知识库检索 ==========
@@ -548,13 +564,6 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         else:
             # 使用当前页内容
             result = await language_learning_chat(request)
-            if not result:
-                return ChatResponse(
-                    reply="抱歉，我暂时无法回答。请稍后再试。",
-                    role="assistant",
-                    sources=[],
-                    intent="language_learning",
-                )
             return ChatResponse(
                 reply=result.get("reply", ""),
                 role=result.get("role", "assistant"),

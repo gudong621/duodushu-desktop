@@ -179,7 +179,7 @@ function ReaderContent() {
     [id],
   );
 
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     log.debug('Page change', { from: currentPage, to: page });
     setCurrentPage(page);
     saveProgress(page);
@@ -187,7 +187,7 @@ function ReaderContent() {
     setVisibleContent("");
     setPageData(null); // Clear stale data to prevent using old coordinates
     setIsContentLoading(true); // 开始加载新页面内容
-  };
+  }, [currentPage, saveProgress]);
 
   // --- Sidebar Layout State ---
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(true);

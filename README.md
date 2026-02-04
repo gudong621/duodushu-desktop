@@ -155,8 +155,8 @@ MIT License
 
 ## 📞 联系方式
 
-- 提交 Issue：[GitHub Issues](https://github.com/xxx/duodushu-desktop/issues)
-- 讨论：[GitHub Discussions](https://github.com/xxx/duodushu-desktop/discussions)
+- 提交 Issue：[GitHub Issues](https://github.com/angelwdx/duodushu-desktop/issues)
+- 讨论：[GitHub Discussions](https://github.com/angelwdx/duodushu-desktop/discussions)
 
 ## 🎯 版本规划
 
@@ -176,4 +176,4 @@ MIT License
 - 支持macos、ipad
 - 支持移动端
 
-**需要帮助？** 查看 [文档](./docs) 或提交 [Issue](https://github.com/xxx/duodushu-desktop/issues)
+**需要帮助？** 查看 [文档](./docs) 或提交 [Issue](https://github.com/angelwdx/duodushu-desktop/issues)

@@ -693,7 +693,8 @@ function ReaderContent() {
             chinese_summary: data.chinese_translation,
           },
           translation: data.chinese_translation,
-          page_number: currentPage,
+          // 关键修复：优先使用选区的精确页码(selection.pageNumber)，解决跨章/跨页时位置偏差问题
+          page_number: selection?.pageNumber ?? currentPage,
         });
         await loadVocabulary(); // Refresh list
       } catch {

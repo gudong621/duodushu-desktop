@@ -161,12 +161,22 @@ export default function EPUBReader({
           const win = contentsObj.window;
           const doc = contentsObj.document;
 
-          // --- 策略：多级降级搜索 ---
-          let query = text.trim();
 
-          if (word) {
-              const cleanText = text.trim();
-              const cleanWord = word.trim();
+          // --- 文本标准化：处理弯引号等 ---
+          const normalizeText = (str: string) => {
+              return str.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
+          };
+          
+          const normalizedText = normalizeText(text);
+          const normalizedWord = word ? normalizeText(word) : undefined;
+
+          // --- 策略：多级降级搜索 ---
+          let query = normalizedText.trim();
+          let isWholeWord = false;
+
+          if (normalizedWord) {
+              const cleanText = normalizedText.trim();
+              const cleanWord = normalizedWord.trim();
               const index = cleanText.toLowerCase().indexOf(cleanWord.toLowerCase());
 
               if (retryLevel === 0) {
@@ -187,22 +197,145 @@ export default function EPUBReader({
                         query = cleanWord;
                    }
               } else if (retryLevel === 2) {
-                   // Level 2: 更宽松模式 - 仅搜索单词 (最不准确，但保证能找到)
+                   // Level 2: 单词模式 - 全字匹配 (最精确单词匹配)
                    query = cleanWord;
+                   isWholeWord = true;
               } else {
-                   // Level 3: 超宽松模式 - 搜索单词的前几个字母
-                   query = cleanWord.substring(0, Math.max(3, Math.floor(cleanWord.length / 2)));
+                   // Level 3: 单词模式 - 非全字匹配 (解决标点符号导致的 WholeWord 失败)
+                   // 但仍搜索完整单词，不截取子串，防止匹配到错误单词(如 proper -> approaching)
+                   query = cleanWord;
+                   isWholeWord = false;
               }
           } else {
-              query = text.substring(0, 20).trim();
+              query = normalizedText.substring(0, 20).trim();
           }
 
-          log.info(`Searching (Level ${retryLevel}): "${query}"`);
+          log.info(`Searching (Level ${retryLevel}): "${query}" (WholeWord: ${isWholeWord})`);
 
           win.getSelection()?.removeAllRanges();
 
-          // 关键修复：关闭 WholeWord (第5个参数设为 false)，允许部分匹配
-          const findResult = win.find(query, false, false, true, false, true, false);
+          let findResult = win.find(query, false, false, true, isWholeWord, true, false);
+          
+          // --- 手动 DOM 遍历搜索 (后备方案) ---
+          if (!findResult && retryLevel >= 2) {
+             try {
+                log.info("window.find failed, trying manual DOM search...");
+                // 辅助函数：在文档中手动查找文本 (支持跨节点)
+                const findRangeInDocument = (doc: Document, text: string): Range | null => {
+                    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null);
+                    const nodes: Node[] = [];
+                    let allText = "";
+                    let node;
+                    
+                    // 1. 构建全文本映射
+                    while (node = walker.nextNode()) {
+                        nodes.push(node);
+                        allText += (node.textContent || "");
+                    }
+                    
+
+                    // 2. 在全文本中搜索
+                    // 同样对 DOM 文本进行标准化 (替换弯引号)，确保能匹配 normalizedText
+                    const normalizeForSearch = (s: string) => s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
+                    
+                    // Regex 构建：转义正则特殊字符
+                    const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const normalizedTarget = normalizeForSearch(text).trim(); // text 已经是 normalizedText
+                    
+                    // 容错正则：允许字符间有软连字符、零宽空格等
+                    // \u00AD: Soft Hyphen, \u200B: Zero Width Space, \u200C: ZWNJ, \u200D: ZWJ, \u2060: Word Joiner, \uFEFF: ZWNBS
+                    const invisibleChars = "[\\u00AD\\u200B\\u200C\\u200D\\u2060\\uFEFF]*";
+                    const escapedTarget = escapeRegExp(normalizedTarget);
+                    const patternString = escapedTarget.split('').join(invisibleChars);
+                    
+                    let startIndex = -1;
+                    let matchLength = 0;
+                    
+                    try {
+                        const regex = new RegExp(patternString, 'i');
+                        // 注意：这里使用未标准化的 allText 进行匹配，因为 allText 可能包含不可见字符，
+                        // 而我们的正则就是为了匹配这些字符设计的。但是，引号需要处理吗？
+                        // 为了同时处理引号和不可见字符，我们最好先处理 allText 的引号。
+                        const normalizedAll = normalizeForSearch(allText);
+                        
+                        const match = regex.exec(normalizedAll);
+                        if (match) {
+                            startIndex = match.index;
+                            matchLength = match[0].length;
+                        }
+                    } catch (e) {
+                         log.warn("Regex construction failed:", e);
+                         // Fallback to simple indexOf if regex fails (unlikely)
+                         const lowerAll = normalizeForSearch(allText).toLowerCase();
+                         const lowerTarget = normalizedTarget.toLowerCase();
+                         startIndex = lowerAll.indexOf(lowerTarget);
+                         matchLength = lowerTarget.length;
+                    }
+                    
+                    if (startIndex === -1) {
+                         // 保持一点日志以便观察，但简化
+                         log.warn("Manual DOM search (Regex) failed.", { target: normalizedTarget });
+                         return null;
+                    }
+                    
+                    // 3. 将索引映射回 DOM 节点
+                    const index = startIndex;
+                    const targetLength = matchLength; // 使用实际匹配长度
+                    let currentIdx = 0;
+                    let startNode: Node | null = null;
+                    let startOffset = 0;
+                    let foundStart = false;
+                    
+                    for (const n of nodes) {
+                        const content = n.textContent || "";
+                        const len = content.length;
+                        
+                        // 找到开始位置
+                        if (!foundStart && currentIdx + len > index) {
+                            startNode = n;
+                            startOffset = index - currentIdx;
+                            foundStart = true;
+                        }
+                        
+                        // 找到结束位置 (可能在同一个节点，也可能在后续节点)
+                        if (foundStart && currentIdx + len >= index + targetLength) {
+                            const endNode = n;
+                            const endOffset = (index + targetLength) - currentIdx;
+                            
+                            const range = doc.createRange();
+                            if (startNode) {
+                                range.setStart(startNode, startOffset);
+                                range.setEnd(endNode, endOffset);
+                                return range;
+                            }
+                        }
+                        
+                        currentIdx += len;
+                    }
+                    return null;
+                };
+
+                const manualRange = findRangeInDocument(doc, query);
+                if (manualRange) {
+                    log.info("Manual DOM search success!");
+                    const selection = win.getSelection();
+                    if (selection) {
+                        selection.removeAllRanges();
+                        selection.addRange(manualRange);
+                        findResult = true; // 伪装成功，让后续逻辑继续
+                    }
+                }
+             } catch (manualErr) {
+                 log.warn("Manual DOM search error:", manualErr);
+             }
+             
+             // Debug: Log the content of the page if search failed
+             if (!findResult && retryLevel === 3) {
+                 const currentContent = bookRef.current?.rendition?.getContents()[0]?.document?.body?.textContent || "";
+                 log.info('Search failed on page. Page content snippet:', currentContent.substring(0, 200).replace(/\s+/g, ' '));
+             }
+          }
+
           log.info(`window.find() result: ${findResult}`, { query });
 
           if (findResult) {
@@ -327,6 +460,7 @@ export default function EPUBReader({
           // --- 搜索失败处理逻辑 ---
 
           // 如果是严格模式失败，先尝试降级，不翻页
+          // Level 3 是最后一级 (Level 2 failed -> Try Level 3)
           if (retryLevel < 3) {
               log.info(`Level ${retryLevel} failed, retrying with Level ${retryLevel + 1}...`);
               // 关键修复：使用 setTimeout 异步重试，避免同步递归导致所有级别立即执行
@@ -986,9 +1120,31 @@ export default function EPUBReader({
                                   const x = iframeRect.left + rect.left + rect.width / 2;
                                   const y = iframeRect.top + rect.top;
                                   
-                                  log.debug('Dispatching selection:', { text, x, y });
+                                  // --- 关键修复：计算精确的章节索引 ---
+                                  let pageNum = undefined;
+                                  let cfi = undefined;
+                                  try {
+                                      // 1. 生成 CFI
+                                      const contents = bookRef.current?.rendition?.getContents()[0];
+                                      if (contents && bookRef.current) {
+                                          cfi = contents.cfiFromRange(range);
+                                          
+                                          // 2. 根据 CFI 获取 Spine Item (章节)
+                                          if (cfi) {
+                                              const spineItem = bookRef.current.spine.get(cfi);
+                                              if (spineItem && typeof spineItem.index === 'number') {
+                                                  pageNum = spineItem.index + 1; // 1-based index
+                                                  log.info("Calculated precise page number from selection:", pageNum, "CFI:", cfi);
+                                              }
+                                          }
+                                      }
+                                  } catch (cfiErr) {
+                                      log.warn("Failed to calculate CFI/Page for selection:", cfiErr);
+                                  }
+
+                                  log.debug('Dispatching selection:', { text, x, y, pageNum });
                                   document.dispatchEvent(new CustomEvent('epub-text-selected', {
-                                      detail: { text, x, y, rect },
+                                      detail: { text, x, y, rect, pageNum, cfi },
                                       bubbles: true
                                   }));
                               }

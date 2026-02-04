@@ -9,12 +9,39 @@ interface SelectionState {
   source?: 'pdf' | 'epub' | 'dictionary' | 'ai' | 'notes' | 'vocab' | 'general';
   rect: DOMRect;
   range?: Range; // 克隆的 Range 用于恢复选区
+  pageNumber?: number; // 新增：精确的章节索引/页码
+  cfi?: string; // 新增：EPUB CFI
 }
 
 export function useGlobalTextSelection(
   enabled: boolean = true,
   excludeSelectors: string[] = []
 ) {
+// ... (lines 14-255 omitted, no changes needed inside hook body implementation until handleEpubSelection)
+
+    // 监听 EPUB iframe 中的文本选择事件
+    const handleEpubSelection = (e: any) => {
+      console.log('[GlobalSelection] Received epub-text-selected event:', e);
+      if (!e.detail) {
+        console.log('[GlobalSelection] No detail in event');
+        return;
+      }
+      
+      const { text, x, y, source, rect, pageNum, cfi } = e.detail;
+      console.log('[GlobalSelection] Text selected in EPUB:', text, 'at', x, y, 'Page:', pageNum);
+      
+      setSelection({
+        text,
+        x,
+        y,
+        source,
+        rect: rect || { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 },
+        pageNumber: pageNum,
+        cfi: cfi
+      });
+      
+      lastSelectionTextRef.current = text;
+    };
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSelectionTextRef = useRef<string>("");
@@ -246,6 +273,7 @@ export function useGlobalTextSelection(
     document.addEventListener('selectionchange', handleSelectionChange);
     
     // 监听 EPUB iframe 中的文本选择事件
+    // 监听 EPUB iframe 中的文本选择事件
     const handleEpubSelection = (e: any) => {
       console.log('[GlobalSelection] Received epub-text-selected event:', e);
       if (!e.detail) {
@@ -253,15 +281,17 @@ export function useGlobalTextSelection(
         return;
       }
       
-      const { text, x, y, source, rect } = e.detail;
-      console.log('[GlobalSelection] Text selected in EPUB:', text, 'at', x, y);
+      const { text, x, y, source, rect, pageNum, cfi } = e.detail;
+      console.log('[GlobalSelection] Text selected in EPUB:', text, 'at', x, y, 'Page:', pageNum);
       
       setSelection({
         text,
         x,
         y,
         source,
-        rect: rect || { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 }
+        rect: rect || { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 },
+        pageNumber: pageNum,
+        cfi: cfi
       });
       
       lastSelectionTextRef.current = text;

@@ -14,25 +14,25 @@
 
 ```mermaid
 graph TD
-    User[用户] --> ElectronWindow[Electron 窗口 (Renderer)]
+    User["用户"] --> ElectronWindow["Electron 窗口 (Renderer)"]
     
     subgraph "Electron 主进程 (Main Process)"
-        Main[Main.ts (Node.js)]
-        AppLifecycle[生命周期管理]
-        NativeMenu[原生菜单/托盘]
-        AutoUpdater[自动更新]
-        PythonManager[Python 进程管理器]
+        Main["Main.ts (Node.js)"]
+        AppLifecycle["生命周期管理"]
+        NativeMenu["原生菜单/托盘"]
+        AutoUpdater["自动更新"]
+        PythonManager["Python 进程管理器"]
     end
     
     subgraph "前端渲染层 (Renderer Process)"
-        NextJS[Next.js App (React)]
-        IPC_Client[IPC 通信模块]
+        NextJS["Next.js App (React)"]
+        IPC_Client["IPC 通信模块"]
     end
     
     subgraph "后端服务层 (Python Subprocess)"
-        FastAPI[FastAPI Server]
-        CoreServices[业务逻辑 (Book/Dict/AI)]
-        SQLite[SQLite 数据库]
+        FastAPI["FastAPI Server"]
+        CoreServices["业务逻辑 (Book/Dict/AI)"]
+        SQLite["SQLite 数据库"]
     end
     
     %% 通信流
@@ -43,7 +43,7 @@ graph TD
     FastAPI -- 读写 --> SQLite
     
     %% 文件系统
-    FastAPI -- 读写 --> UserData[用户数据目录 (AppData)]
+    FastAPI -- 读写 --> UserData["用户数据目录 (AppData)"]
 ```
 
 ---
